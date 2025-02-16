@@ -32,3 +32,6 @@ config/*/*.conf
 
 # Ignore benchmarks logs
 benchmarks/logs/
+
+# Ignore .env
+.env
