@@ -1,5 +1,7 @@
 # ID2203-GOD-Project - Distributed SQL DB
 
+Basic skeleton based on the [OmniPaxos-kv](https://github.com/haraldng/omnipaxos-kv/tree/main) library
+
 ![Preliminary Structure](./Images/PreliminaryStructure.svg)
 
 
