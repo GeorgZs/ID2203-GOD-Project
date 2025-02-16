@@ -1,0 +1,21 @@
+#!/bin/bash
+# COPY THIS FILE INTO ./project_env.sh BEFORE CONFIGURING ENVIRONMENT VARIABLES!
+export PROJECT_ID="my-project-1499979282244" # Harald's project id
+export SERVICE_ACCOUNT="deployment@$PROJECT_ID.iam.gserviceaccount.com" # Service account attached to GCP instances
+
+# Running `gcloud compute os-login describe-profile` should result in YAML data
+# with info about your os-login. Set OSLOGIN_USERNAME to posixAccounts.username
+# and OSLOGIN_UID to posixAccounts.uid for the GCP project
+#
+# If you don't have a posix account for the GCP project, one will be generated with the following steps:
+#  1. Authenticate gcloud using the `./auth.sh` script
+#  2. (If needed) Generate an ssh keypair at `~/.ssh/google_compute_engine`
+#  3. `gcloud compute os-login ssh-keys add --key-file=`~/.ssh/google_compute_engine.pub`
+export OSLOGIN_USERNAME=""
+export OSLOGIN_UID=""
+
+# The names used for the client and server Docker images when they are
+# pushed to the GCP Artifact Registry. See `./push-client-image.sh`
+# and `./push-server-image.sh`.
+export CLIENT_DOCKER_IMAGE_NAME="gcr.io/$PROJECT_ID/${OSLOGIN_UID}_omnipaxos_client"
+export SERVER_DOCKER_IMAGE_NAME="gcr.io/$PROJECT_ID/${OSLOGIN_UID}_omnipaxos_server"

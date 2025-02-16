@@ -1,0 +1,18 @@
+cluster_name = "local-cluster"
+location = "local-1"
+server_id = 1 # the server to connect to
+local_deployment = true # use localhost
+summary_filepath = "../benchmarks/logs/local-run/client-1.json"
+output_filepath = "../benchmarks/logs/local-run/client-1.csv"
+
+# Defining TOML vector of (duration_sec, requests_per_sec, read_ratio) which determines the behavior of the client requests
+[[requests]]
+duration_sec = 10
+requests_per_sec = 1
+read_ratio = 0.25
+
+[[requests]]
+duration_sec = 5
+requests_per_sec = 10
+read_ratio = 0.25
+

@@ -1,0 +1,7 @@
+# Exclude everything
+*
+
+# Whitelist Rust code
+!src/
+!Cargo.toml
+!Cargo.lock

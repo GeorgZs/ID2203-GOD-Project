@@ -1,0 +1,36 @@
+
+x-common-variables: &common-variables
+  RUST_LOG: "debug"
+  CONFIG_FILE: "~/server-config.toml"
+
+services:
+  s1:
+    image: omnipaxos-server
+    build:
+      context: ./..
+      dockerfile: omnipaxos_server/Dockerfile
+    container_name: s1
+    environment:
+      <<: *common-variables
+    volumes:
+      - ./server-1-config.toml:~/server-config.toml
+    ports:
+      - "8001:8001"
+  s2:
+    image: omnipaxos-server
+    container_name: s2
+    environment:
+      <<: *common-variables
+    volumes:
+      - ./server-2-config.toml:~/server-config.toml
+    ports:
+      - "8002:8002"
+  s3:
+    image: omnipaxos-server
+    container_name: s3
+    environment:
+      <<: *common-variables
+    volumes:
+      - ./server-3-config.toml:~/server-config.toml
+    ports:
+      - "8003:8003"
