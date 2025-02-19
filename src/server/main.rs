@@ -2,6 +2,10 @@ use crate::{configs::OmniPaxosServerConfig, server::OmniPaxosServer};
 use env_logger;
 use std::{env, fs};
 use toml;
+use db::postgres_connection::PGConnection;
+use db::repository::Repository;
+use omnipaxos_kv::db;
+use omnipaxos_kv::db::repository::DataSourceConnection;
 
 mod configs;
 mod database;
@@ -22,8 +26,12 @@ pub async fn main() {
     };
     let mut server = OmniPaxosServer::new(server_config).await;
     server.run().await;*/
-    println!("Hello Mihail!!");
+    println!("Hello Mihhail!!");
     // Connect to db here
+    let mut pg_con = PGConnection::new().await;
+    let rep = Repository::new(pg_con);
+
+
 
     // Write simple insert
 

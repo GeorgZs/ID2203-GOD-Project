@@ -34,3 +34,32 @@ services:
       - ./server-3-config.toml:~/server-config.toml
     ports:
       - "8003:8003"
+  db:
+    image: postgres:latest
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - postgres-network
+    volumes:
+      - ../pg-data/:/var/lib/god_db/data/
+#      - ${PWD}/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    ports:
+     - "8009:8080"
+    networks:
+      - postgres-network
+    depends_on:
+     - db
+
+networks:
+  postgres-network:
+    driver: bridge
