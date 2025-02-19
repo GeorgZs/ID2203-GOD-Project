@@ -25,6 +25,9 @@ RUN cargo build --release --bin server
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
+# Install OpenSSL and required libraries
+RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/target/release/server /usr/local/bin
 EXPOSE 8000
 ENTRYPOINT ["/usr/local/bin/server"]

@@ -3,7 +3,7 @@ use std::future::Future;
 
 pub trait DataSourceConnection {
     fn new() -> impl Future<Output = Self>;
-    fn execute_query(&self);
+    fn read(&self, query_string: &str) -> impl Future<Output = ()>;
 }
 
 pub struct Repository <T: DataSourceConnection> {
@@ -15,8 +15,8 @@ impl <T: DataSourceConnection> Repository<T> {
         Self { connection }
     }
 
-    pub async fn query(&self, query: &str) -> Result<(), ()> {
-        self.connection.execute_query();
+    pub async fn query(&self, query_string: &str) -> Result<(), ()> {
+        self.connection.read(query_string);
         Ok(())
     }
 }

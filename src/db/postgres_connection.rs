@@ -1,6 +1,7 @@
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use dotenv::dotenv;
+use sqlx::query;
 use crate::db::repository::DataSourceConnection;
 
 pub struct PGConnection {
@@ -12,18 +13,37 @@ impl DataSourceConnection for PGConnection {
         dotenv().ok();
 
         // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let database_url = "postgres://myuser:mypassword@localhost/rust_db";
+        let database_url = "postgres://myuser:mypassword@db:5432/postgres"; //for docker, if not docker use localhost
 
         let pool = PgPoolOptions::new()
             .max_connections(5)
             .connect(&database_url).await.unwrap();
 
+        println!("DB connection created!");
         PGConnection{pool}
     }
 
-    fn execute_query(&self) {
+    async fn read(&self, query_string: &str) {
         // todo!();
-        println!("Hello, world!");
+        println!("Reading from database!");
+        let output = sqlx::query(query_string).fetch_all(&self.pool).await;
+
+        match output {
+            Ok(rows) => {
+                for row in rows {
+                    println!("{:?}", row);
+                }
+            },
+            Err(e) => println!("Error executing query: {:?}", e),
+        }
+
+        // pub async fn get_user(pool: &sqlx::PgPool, user_id: i32) -> Result<User, sqlx::Error> {
+        //     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")
+        //         .bind(user_id)
+        //         .fetch_one(pool)
+        //         .await?;
+        //     Ok(user)
+        // }
     }
 }
 

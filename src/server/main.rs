@@ -32,6 +32,8 @@ pub async fn main() {
     let rep = Repository::new(pg_con);
 
 
+     Repository::query(&rep, "SELECT * FROM users;").await.expect("TODO: panic message");
+
 
     // Write simple insert
 
