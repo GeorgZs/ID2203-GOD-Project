@@ -13,7 +13,7 @@ services:
     environment:
       <<: *common-variables
     volumes:
-      - ./server-1-config.toml:~/server-config.toml
+      - ./server-1-config.toml:$HOME/server-config.toml
     ports:
       - "8001:8001"
   s2:
@@ -22,7 +22,7 @@ services:
     environment:
       <<: *common-variables
     volumes:
-      - ./server-2-config.toml:~/server-config.toml
+      - ./server-2-config.toml:$HOME/server-config.toml
     ports:
       - "8002:8002"
   s3:
@@ -31,7 +31,7 @@ services:
     environment:
       <<: *common-variables
     volumes:
-      - ./server-3-config.toml:~/server-config.toml
+      - ./server-3-config.toml:$HOME/server-config.toml
     ports:
       - "8003:8003"
   db:
@@ -43,7 +43,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       PGDATA: /var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "5431:5432"
     networks:
       - postgres-network
     volumes:
