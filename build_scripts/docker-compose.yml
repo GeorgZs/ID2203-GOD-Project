@@ -48,7 +48,8 @@ services:
       - postgres-network
     volumes:
       - ../pg-data/:/var/lib/god_db/data/
-#      - ${PWD}/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: ["postgres"]
 
   adminer:
     image: adminer
