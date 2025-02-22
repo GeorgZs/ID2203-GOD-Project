@@ -4,6 +4,7 @@ use std::future::Future;
 pub trait DataSourceConnection {
     fn new() -> impl Future<Output = Self>;
     fn read(&self, query_string: &str) -> impl Future<Output = ()>;
+    fn write(&self, query_string: &str) -> impl Future<Output = ()>;
 }
 
 pub struct Repository <T: DataSourceConnection> {
@@ -15,8 +16,13 @@ impl <T: DataSourceConnection> Repository<T> {
         Self { connection }
     }
 
-    pub async fn query(&self, query_string: &str) -> Result<(), ()> {
-        self.connection.read(query_string);
+    pub async fn query(&self, query_string: &str, query_type: &str) -> Result<(), ()> {
+        match query_type {
+            "read" => self.connection.read(query_string).await,
+            "write" => self.connection.write(query_string).await,
+            _ => panic!("Invalid query type")
+            
+        }
         Ok(())
     }
 }

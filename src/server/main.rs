@@ -26,14 +26,18 @@ pub async fn main() {
     };
     let mut server = OmniPaxosServer::new(server_config).await;
     server.run().await;*/
+
     println!("Hello Mihhail!!");
     // Connect to db here
-    let mut pg_con = PGConnection::new().await;
+    let pg_con = PGConnection::new().await;
     let rep = Repository::new(pg_con);
 
+    Repository::query(&rep, "SELECT * FROM users;", "read").await.expect("TODO: panic message");
 
-     Repository::query(&rep, "SELECT * FROM users;").await.expect("TODO: panic message");
+    Repository::query(&rep, "INSERT INTO users (name) VALUES ('Jeff'), ('Rob');", "write").await.expect("TODO: panic message");
 
+    Repository::query(&rep, "SELECT * FROM users;", "read").await.expect("TODO: panic message");
+    // println!("{:?}", res);
 
     // Write simple insert
 
