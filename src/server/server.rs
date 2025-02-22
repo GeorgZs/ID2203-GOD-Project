@@ -28,6 +28,7 @@ pub struct OmniPaxosServer {
     output_file: File,
     config: OmniPaxosServerConfig,
     peers: Vec<NodeId>,
+    bypass_paxos: bool,
 }
 
 impl OmniPaxosServer {
@@ -68,6 +69,7 @@ impl OmniPaxosServer {
             output_file,
             peers: config.get_peers(config.server_id),
             config,
+            bypass_paxos: true,
         };
         // Save config to output file
         server.save_output().expect("Failed to write to file");
@@ -75,15 +77,11 @@ impl OmniPaxosServer {
     }
 
     pub async fn run(&mut self, connection: PGConnection) {
-
-        println!("Running");
         
         let mut client_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
         let mut cluster_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
 
         let repository = Repository::new(connection);
-
-        // Previous existing logic
         
         // We don't use Omnipaxos leader election and instead force an initial leader
         // Once the leader is established it chooses a synchronization point which the
@@ -100,42 +98,21 @@ impl OmniPaxosServer {
         loop {
             tokio::select! {
                 _ = election_interval.tick() => {
+
                     self.omnipaxos.tick();
                     self.send_outgoing_msgs();
                 },
                 _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
+   
                     self.handle_cluster_messages(&mut cluster_msg_buf).await;
+
                 },
                 _ = self.network.client_messages.recv_many(&mut client_msg_buf, NETWORK_BATCH_SIZE) => {
+
                     self.handle_client_messages(&mut client_msg_buf).await;
                 },
             }
         }
-
-        // if self.config.initial_leader == self.id {
-        //     self.become_initial_leader(&mut cluster_msg_buf, &mut client_msg_buf)
-        //         .await;
-        //     let experiment_sync_start = (Utc::now() + Duration::from_secs(2)).timestamp_millis();
-        //     self.send_cluster_start_signals(experiment_sync_start);
-        //     self.send_client_start_signals(experiment_sync_start);
-        // }
-
-        // let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
-
-        // loop {
-        //     tokio::select! {
-        //         _ = election_interval.tick() => {
-        //                 self.omnipaxos.tick();
-        //                 self.send_outgoing_msgs();
-        //             },
-        //         _ = self.network.client_messages.recv_many(&mut client_msg_buf, NETWORK_BATCH_SIZE) => {
-        //             self.handle_client_messages(&mut client_msg_buf).await;
-        //         },
-        //         _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
-        //             // Handle cluster messages if needed
-        //         },
-        //     }
-        // }
 
     }
 
@@ -168,6 +145,15 @@ impl OmniPaxosServer {
             }
         }
     }
+
+    // async fn handle_query_without_paxos(&mut self, from: ClientId, command_id: CommandId, kv_command: KVCommand, repository: &Repository) {
+    //     // Decomposing SQL action:
+    //     println!("Going through the repository");
+    //     self.network.send_to_client(from, "Hola message received")
+
+
+        
+    // }
 
     fn handle_decided_entries(&mut self) {
         // TODO: Can use a read_raw here to avoid allocation
@@ -228,17 +214,17 @@ impl OmniPaxosServer {
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
             trace!("{}: Received {message:?}", self.id);
-            // match message {
-            //     ClusterMessage::OmniPaxosMessage(m) => {
-            //         self.omnipaxos.handle_incoming(m);
-            //         self.handle_decided_entries();
-            //     }
-            //     ClusterMessage::LeaderStartSignal(start_time) => {
-            //         self.send_client_start_signals(start_time)
-            //     }
-            // }
+            match message {
+                ClusterMessage::OmniPaxosMessage(m) => {
+                    self.omnipaxos.handle_incoming(m);
+                    self.handle_decided_entries();
+                }
+                ClusterMessage::LeaderStartSignal(start_time) => {
+                    self.send_client_start_signals(start_time)
+                }
+            }
         }
-        // self.send_outgoing_msgs();
+        self.send_outgoing_msgs();
     }
 
     fn append_to_log(&mut self, from: ClientId, command_id: CommandId, kv_command: KVCommand) {

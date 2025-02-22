@@ -133,9 +133,22 @@ impl Client {
     }
 
     async fn send_request(&mut self, is_write: bool) {
-        let key = self.next_request_id.to_string();
+        let key: String;
+        let value: String;
+
+        if is_write {
+            key = "test_name".to_string();
+            value = "test_value".to_string();
+        } 
+        
+        else {
+            key = "test_name".to_string();
+            value = "test_value".to_string();
+        }
+
+        // let key = self.next_request_id.to_string();
         let cmd = match is_write {
-            true => KVCommand::Put(key.clone(), key),
+            true => KVCommand::Put(key, value),
             false => KVCommand::Get(key),
         };
         let request = ClientMessage::Append(self.next_request_id, cmd);
