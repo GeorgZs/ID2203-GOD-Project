@@ -8,9 +8,10 @@ use omnipaxos::{
     util::{LogEntry, NodeId},
     OmniPaxos, OmniPaxosConfig,
 };
-use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
+use omnipaxos_kv::{common::{kv::*, messages::*, utils::Timestamp}, db::repository::Repository};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use std::{fs::File, io::Write, time::Duration};
+use omnipaxos_kv::db::postgres_connection::PGConnection;
 
 type OmniPaxosInstance = OmniPaxos<Command, MemoryStorage<Command>>;
 const NETWORK_BATCH_SIZE: usize = 100;
@@ -73,9 +74,17 @@ impl OmniPaxosServer {
         server
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self, connection: PGConnection) {
+
+        println!("Running");
+        
         let mut client_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
         let mut cluster_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
+
+        let repository = Repository::new(connection);
+
+        // Previous existing logic
+        
         // We don't use Omnipaxos leader election and instead force an initial leader
         // Once the leader is established it chooses a synchronization point which the
         // followers relay to their clients to begin the experiment.
@@ -102,6 +111,32 @@ impl OmniPaxosServer {
                 },
             }
         }
+
+        // if self.config.initial_leader == self.id {
+        //     self.become_initial_leader(&mut cluster_msg_buf, &mut client_msg_buf)
+        //         .await;
+        //     let experiment_sync_start = (Utc::now() + Duration::from_secs(2)).timestamp_millis();
+        //     self.send_cluster_start_signals(experiment_sync_start);
+        //     self.send_client_start_signals(experiment_sync_start);
+        // }
+
+        // let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
+
+        // loop {
+        //     tokio::select! {
+        //         _ = election_interval.tick() => {
+        //                 self.omnipaxos.tick();
+        //                 self.send_outgoing_msgs();
+        //             },
+        //         _ = self.network.client_messages.recv_many(&mut client_msg_buf, NETWORK_BATCH_SIZE) => {
+        //             self.handle_client_messages(&mut client_msg_buf).await;
+        //         },
+        //         _ = self.network.cluster_messages.recv_many(&mut cluster_msg_buf, NETWORK_BATCH_SIZE) => {
+        //             // Handle cluster messages if needed
+        //         },
+        //     }
+        // }
+
     }
 
     // Ensures cluster is connected and leader is promoted before returning.
@@ -193,17 +228,17 @@ impl OmniPaxosServer {
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
             trace!("{}: Received {message:?}", self.id);
-            match message {
-                ClusterMessage::OmniPaxosMessage(m) => {
-                    self.omnipaxos.handle_incoming(m);
-                    self.handle_decided_entries();
-                }
-                ClusterMessage::LeaderStartSignal(start_time) => {
-                    self.send_client_start_signals(start_time)
-                }
-            }
+            // match message {
+            //     ClusterMessage::OmniPaxosMessage(m) => {
+            //         self.omnipaxos.handle_incoming(m);
+            //         self.handle_decided_entries();
+            //     }
+            //     ClusterMessage::LeaderStartSignal(start_time) => {
+            //         self.send_client_start_signals(start_time)
+            //     }
+            // }
         }
-        self.send_outgoing_msgs();
+        // self.send_outgoing_msgs();
     }
 
     fn append_to_log(&mut self, from: ClientId, command_id: CommandId, kv_command: KVCommand) {

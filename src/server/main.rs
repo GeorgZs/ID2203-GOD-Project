@@ -14,7 +14,7 @@ mod server;
 
 #[tokio::main]
 pub async fn main() {
-    /*env_logger::init();
+    env_logger::init();
     let config_file = match env::var("CONFIG_FILE") {
         Ok(file_path) => file_path,
         Err(_) => panic!("Requires CONFIG_FILE environment variable"),
@@ -24,13 +24,15 @@ pub async fn main() {
         Ok(parsed_config) => parsed_config,
         Err(e) => panic!("{e}"),
     };
-    let mut server = OmniPaxosServer::new(server_config).await;
-    server.run().await;*/
 
-    println!("Hello Mihhail!!");
-    // Connect to db here
-    let pg_con = PGConnection::new().await;
-    let rep = Repository::new(pg_con);
+    // Connect to database
+    let postgres_connection = PGConnection::new().await;
+
+    let mut server = OmniPaxosServer::new(server_config).await;
+    server.run(postgres_connection).await;
+
+    /*
+    let rep = Repository::new(postgres_connection);
 
     Repository::query(&rep, "SELECT * FROM users;", "read").await.expect("TODO: panic message");
 
@@ -42,4 +44,5 @@ pub async fn main() {
     // Write simple insert
 
     // Query and print the data
+    */
 }
