@@ -2,6 +2,8 @@ use client::{Client, ClientConfig};
 use core::panic;
 use env_logger;
 use std::{env, fs};
+use std::any::Any;
+use std::iter::Map;
 use toml;
 
 mod client;

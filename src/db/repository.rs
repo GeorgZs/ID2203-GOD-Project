@@ -1,3 +1,4 @@
+use std::any::Any;
 //Define CRUD operations
 use std::future::Future;
 
@@ -10,6 +11,9 @@ pub trait DataSourceConnection {
 pub struct Repository <T: DataSourceConnection> {
     connection: T
 }
+
+
+
 
 impl <T: DataSourceConnection> Repository<T> {
     pub fn new(connection: T) -> Self {
