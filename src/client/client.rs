@@ -133,23 +133,20 @@ impl Client {
     }
 
     async fn send_request(&mut self, is_write: bool) {
-        let key: String;
+        let mut key: String = self.next_request_id.to_string();
         let value: String;
 
         if is_write {
-            key = "test_name".to_string();
-            value = "test_value".to_string();
+            key = key.to_string();
+            value = format!("INSERT INTO users (name) VALUES ('{}');", key);
         } 
-        
         else {
-            key = "test_name".to_string();
-            value = "test_value".to_string();
+            value = format!("SELECT * FROM users;");
         }
 
-        // let key = self.next_request_id.to_string();
         let cmd = match is_write {
             true => KVCommand::Put(key, value),
-            false => KVCommand::Get(key),
+            false => KVCommand::Get(value),
         };
         let request = ClientMessage::Append(self.next_request_id, cmd);
         debug!("Sending {request:?}");
