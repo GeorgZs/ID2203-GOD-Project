@@ -1,5 +1,7 @@
 use crate::{configs::OmniPaxosServerConfig, server::OmniPaxosServer};
 use env_logger;
+use omnipaxos_kv::db::postgres_parser::PGParser;
+use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
 use std::{env, fs};
 use toml;
 use db::postgres_connection::PGConnection;
@@ -37,8 +39,25 @@ pub async fn main() {
     Repository::query(&rep, "INSERT INTO users (name) VALUES ('Jeff'), ('Rob');", "write").await.expect("TODO: panic message");
 
     Repository::query(&rep, "SELECT * FROM users;", "read").await.expect("TODO: panic message");
-    // println!("{:?}", res);
 
+    let pg_parser = PGParser::new();
+    let parser = QueryParser::new(pg_parser);
+
+    //There are two options with my implementation:
+    //1. Pass a DataSourceObject to the parser, returning a query string (stores query in parser as well)
+    // parser.parse_dso("insert", object);
+
+    //2. Read the query string from the parser, containing past queries as a Vec<String>
+    // let queries = parser.get_query_string();
+    // for query in queries {
+        // println!("{}", query);
+    // }
+    //The first option is more convenient and easy, but the second option is secure and allows for more control with concurrent queries
+    
+    // 1st => easy and read queries as they come
+    // 2nd => secure and need to iterate or pop from list of queries
+
+   
     // Write simple insert
 
     // Query and print the data
