@@ -34,13 +34,13 @@ impl Parse for PGParser {
         } else {
             //ony one value to enter
             query_string.push_str(&object.row_data[0].row_name);
-            query_string.push_str(") VALUES (");
+            query_string.push_str(") VALUES ('");
             query_string.push_str(&object.row_data[0].row_value);
         }
         
-        query_string.push_str(");");
+        query_string.push_str("');");
         self.query_string.push(query_string.clone());
-
+        println!("{}", query_string.clone());
         query_string
     }
     // fn parse_update(object: DataSourceObject) -> String {}
@@ -48,7 +48,6 @@ impl Parse for PGParser {
         let mut query_string = String::from("SELECT * FROM ");
         query_string.push_str(&object.table_name);
         query_string.push_str(";");
-        self.query_string.push(query_string.clone());
 
         query_string
     }
