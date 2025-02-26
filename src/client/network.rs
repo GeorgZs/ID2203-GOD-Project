@@ -1,6 +1,6 @@
 use futures::{SinkExt, StreamExt};
 use log::*;
-use omnipaxos_kv::common::{kv::NodeId, messages::*, utils::*};
+use omnipaxos_kv::common::{ds::NodeId, messages::*, utils::*};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;

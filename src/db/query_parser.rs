@@ -1,22 +1,7 @@
-pub struct RowData {
-    pub row_name: String,
-    pub row_value: String
-}
-pub struct DataSourceObject {
-    pub table_name: String,
-    pub row_data: Vec<RowData>
-}
+use crate::common::ds::DataSourceObject;
+use crate::common::ds::DataSourceCommand;
+use crate::common::ds::DataSourceQueryType;
 
-pub enum DataSourceQueryType {
-    INSERT,
-    UPDATE,
-    READ
-}
-
-pub struct DataSourceCommand {
-    pub data_source_object: DataSourceObject,
-    pub query_type: DataSourceQueryType
-}
 //Trait parse corresponds to what database we are using (i.e. Postgres, MySQL, etc)
 pub trait Parse {
     fn new() -> Self; //return struct with new vec of queries to read from

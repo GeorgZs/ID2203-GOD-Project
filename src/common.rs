@@ -3,7 +3,7 @@ pub mod messages {
     use serde::{Deserialize, Serialize};
 
     use super::{
-        kv::{Command, CommandId, KVCommand},
+        ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
     };
 
@@ -21,7 +21,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
-        Append(CommandId, KVCommand),
+        Append(CommandId, DataSourceCommand),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -42,10 +42,9 @@ pub mod messages {
     }
 }
 
-pub mod kv {
-    use omnipaxos::{macros::Entry, storage::Snapshot};
+pub mod ds {
+    use omnipaxos::{macros::Entry};
     use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
 
     pub type CommandId = usize;
     pub type ClientId = u64;
@@ -57,17 +56,34 @@ pub mod kv {
         pub client_id: ClientId,
         pub coordinator_id: NodeId,
         pub id: CommandId,
-        pub kv_cmd: KVCommand,
+        pub ds_cmd: DataSourceCommand,
+    }
+
+    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    pub struct RowData {
+        pub row_name: String,
+        pub row_value: String
+    }
+    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    pub struct DataSourceObject {
+        pub table_name: String,
+        pub row_data: Vec<RowData>
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
-    pub enum KVCommand {
-        Put(String, String),
-        Delete(String),
-        Get(String),
+    pub enum DataSourceQueryType {
+        INSERT,
+        UPDATE,
+        READ
     }
 
-    #[derive(Clone, Debug, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    pub struct DataSourceCommand {
+        pub data_source_object: DataSourceObject,
+        pub query_type: DataSourceQueryType
+    }
+
+    /*#[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct KVSnapshot {
         snapshotted: HashMap<String, String>,
         deleted_keys: Vec<String>,
@@ -112,11 +128,11 @@ pub mod kv {
         fn use_snapshots() -> bool {
             true
         }
-    }
+    }*/
 }
 
 pub mod utils {
-    use super::{kv::NodeId, messages::*};
+    use super::{ds::NodeId, messages::*};
     use std::net::{SocketAddr, ToSocketAddrs};
     use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
     use tokio::net::TcpStream;

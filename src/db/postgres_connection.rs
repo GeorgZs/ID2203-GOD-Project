@@ -1,7 +1,6 @@
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use dotenv::dotenv;
-use sqlx::query;
 use crate::db::repository::DataSourceConnection;
 
 pub struct PGConnection {

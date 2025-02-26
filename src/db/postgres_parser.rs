@@ -1,5 +1,5 @@
 use crate::db::query_parser::Parse;
-use crate::db::query_parser::DataSourceObject;
+use crate::common::ds::DataSourceObject;
 
 pub struct PGParser {
     query_string: Vec<String> //have a list of past queries

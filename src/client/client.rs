@@ -1,11 +1,12 @@
 use crate::{data_collection::ClientData, network::Network};
 use chrono::Utc;
 use log::*;
-use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
+use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
+use omnipaxos_kv::common::ds::DataSourceQueryType::INSERT;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientConfig {
@@ -133,12 +134,24 @@ impl Client {
     }
 
     async fn send_request(&mut self, is_write: bool) {
-        let key = self.next_request_id.to_string();
+        //TODO!!
+        let ds_command = DataSourceCommand {
+            query_type: DataSourceQueryType::INSERT,
+            data_source_object: DataSourceObject {
+                table_name: String::from("users"),
+                row_data: vec![RowData{
+                    row_name: String::from("name"),
+                    row_value: String::from("Mihhail")
+                },
+                ]
+            }
+        };
+        /*let key = self.next_request_id.to_string();
         let cmd = match is_write {
             true => KVCommand::Put(key.clone(), key),
             false => KVCommand::Get(key),
-        };
-        let request = ClientMessage::Append(self.next_request_id, cmd);
+        };*/
+        let request = ClientMessage::Append(self.next_request_id, ds_command);
         debug!("Sending {request:?}");
         self.network.send(self.active_server, request).await;
         self.client_data.new_request(is_write);

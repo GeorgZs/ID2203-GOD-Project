@@ -8,7 +8,7 @@ use omnipaxos::{
     util::{LogEntry, NodeId},
     OmniPaxos, OmniPaxosConfig,
 };
-use omnipaxos_kv::common::{kv::*, messages::*, utils::Timestamp};
+use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use std::{fs::File, io::Write, time::Duration};
 
@@ -59,7 +59,7 @@ impl OmniPaxosServer {
         let output_file = File::create(config.output_filepath.clone()).unwrap();
         let mut server = OmniPaxosServer {
             id: config.server_id,
-            database: Database::new(),
+            database: Database::new().await,
             network,
             omnipaxos,
             current_decided_idx: 0,
@@ -134,7 +134,7 @@ impl OmniPaxosServer {
         }
     }
 
-    fn handle_decided_entries(&mut self) {
+    async fn handle_decided_entries(&mut self) {
         // TODO: Can use a read_raw here to avoid allocation
         let new_decided_idx = self.omnipaxos.get_decided_idx();
         if self.current_decided_idx < new_decided_idx {
@@ -151,14 +151,14 @@ impl OmniPaxosServer {
                     _ => unreachable!(),
                 })
                 .collect();
-            self.update_database_and_respond(decided_commands);
+            self.update_database_and_respond(decided_commands).await;
         }
     }
 
-    fn update_database_and_respond(&mut self, commands: Vec<Command>) {
+    async fn update_database_and_respond(&mut self, commands: Vec<Command>) {
         // TODO: batching responses possible here (batch at handle_cluster_messages)
         for command in commands {
-            let read = self.database.handle_command(command.kv_cmd);
+            let read = self.database.handle_command(command.ds_cmd).await;
             if command.coordinator_id == self.id {
                 let response = match read {
                     Some(read_result) => ServerMessage::Read(command.id, read_result),
@@ -196,7 +196,7 @@ impl OmniPaxosServer {
             match message {
                 ClusterMessage::OmniPaxosMessage(m) => {
                     self.omnipaxos.handle_incoming(m);
-                    self.handle_decided_entries();
+                    self.handle_decided_entries().await;
                 }
                 ClusterMessage::LeaderStartSignal(start_time) => {
                     self.send_client_start_signals(start_time)
@@ -206,12 +206,12 @@ impl OmniPaxosServer {
         self.send_outgoing_msgs();
     }
 
-    fn append_to_log(&mut self, from: ClientId, command_id: CommandId, kv_command: KVCommand) {
+    fn append_to_log(&mut self, from: ClientId, command_id: CommandId, ds_command: DataSourceCommand) {
         let command = Command {
             client_id: from,
             coordinator_id: self.id,
             id: command_id,
-            kv_cmd: kv_command,
+            ds_cmd: ds_command,
         };
         self.omnipaxos
             .append(command)

@@ -1,7 +1,7 @@
 use futures::{SinkExt, StreamExt};
 use log::*;
 use omnipaxos_kv::common::{
-    kv::{ClientId, NodeId},
+    ds::{ClientId, NodeId},
     messages::*,
     utils::*,
 };
