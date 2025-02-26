@@ -1,10 +1,5 @@
 use crate::db::query_parser::Parse;
 use crate::db::query_parser::DataSourceObject;
-enum PG_Qtype {
-    INSERT,
-    UPDATE,
-    READ
-}
 
 pub struct PGParser {
     query_string: Vec<String> //have a list of past queries
