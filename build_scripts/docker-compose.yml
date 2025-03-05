@@ -152,5 +152,6 @@ services:
 
 networks:
   postgres-network:
+    driver: bridge
   servers-network:
     driver: bridge
