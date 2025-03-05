@@ -16,6 +16,16 @@ pub struct OmniPaxosServerConfig {
     pub nodes: Vec<NodeId>,
     pub initial_leader: NodeId,
     pub initial_flexible_quorum: Option<FlexibleQuorum>,
+    pub db_config: DBConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DBConfig {
+    pub host: String,
+    pub port: String,
+    pub db: String,
+    pub user: String,
+    pub password: String
 }
 
 impl Into<OmniPaxosConfig> for OmniPaxosServerConfig {

@@ -1,7 +1,7 @@
 use std::future::Future;
 
 pub trait DataSourceConnection {
-    fn new() -> impl Future<Output = Self>;
+    fn new(host: String, port: String, db: String, user: String, password: String) -> impl Future<Output = Self>;
     fn read(&self, query_string: &str) -> impl Future<Output = ()>;
     fn write(&self, query_string: &str) -> impl Future<Output = ()>;
 }

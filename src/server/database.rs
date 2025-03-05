@@ -5,15 +5,17 @@ use omnipaxos_kv::db::postgres_parser::PGParser;
 use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
 use omnipaxos_kv::db::repository::{DataSourceConnection, Repository};
 
+use crate::configs::DBConfig;
+
 pub struct Database {
     db: Repository<PGConnection>,
     parser: QueryParser<PGParser>,
 }
 
 impl Database {
-    pub async fn new() -> Self {
+    pub async fn new(db_config: DBConfig) -> Self {
         Self {
-            db: Repository::new(PGConnection::new().await),
+            db: Repository::new(PGConnection::new(db_config.host, db_config.port, db_config.db, db_config.user, db_config.password).await),
             parser: QueryParser::new(PGParser::new())
         }
     }

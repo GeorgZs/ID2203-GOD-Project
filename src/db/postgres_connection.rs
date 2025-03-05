@@ -1,5 +1,4 @@
 use sqlx::postgres::PgPoolOptions;
-use std::env;
 use dotenv::dotenv;
 use crate::db::repository::DataSourceConnection;
 
@@ -8,20 +7,16 @@ pub struct PGConnection {
 }
 
 impl DataSourceConnection for PGConnection {
-    async fn new() -> Self {
+    async fn new(host: String, port: String, db: String, user: String, password: String) -> Self {
         dotenv().ok();
-
-        // let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let postgres_user = env::var("POSTGRES_USER").expect("POSTGRES_USER must be set");
-        let postgres_password = env::var("POSTGRES_PASSWORD").expect("POSTGRES_PASSWORD must be set");
 
         // let host = "db"; //should be localhost if not docker
         // let port = "5432"; //should be 5431 if not docker
 
-        let host = "localhost";
-        let port = "5431"; 
+        // let host = "localhost";
+        // let port = "5431"; 
 
-        let database_url = format!("postgres://{postgres_user}:{postgres_password}@{host}:{port}/postgres"); //for docker, if not docker use localhost
+        let database_url = format!("postgres://{user}:{password}@{host}:{port}/{db}"); //for docker, if not docker use localhost
 
         let pool = PgPoolOptions::new()
             .max_connections(5)

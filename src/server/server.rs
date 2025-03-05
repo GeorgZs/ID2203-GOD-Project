@@ -57,9 +57,11 @@ impl OmniPaxosServer {
         )
         .await;
         let output_file = File::create(config.output_filepath.clone()).unwrap();
+
+        let db_config = config.db_config.clone();
         let mut server = OmniPaxosServer {
             id: config.server_id,
-            database: Database::new().await,
+            database: Database::new(db_config).await,
             network,
             omnipaxos,
             current_decided_idx: 0,
