@@ -8,3 +8,4 @@ cluster_name = "local-cluster"
 nodes = [1, 2, 3]
 initial_leader = 1
 initial_flexible_quorum = { read_quorum_size = 2, write_quorum_size = 2 }
+db_config = { host = "localhost", port = "5433", db = "postgres", user = "myuser", password = "mypassword" }
