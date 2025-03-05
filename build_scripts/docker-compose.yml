@@ -34,6 +34,31 @@ services:
       - ./server-3-config.toml:$HOME/server-config.toml
     ports:
       - "8003:8003"
+
+  c1:
+    image: omnipaxos-client
+    build:
+      context: ./..
+      dockerfile: client.dockerfile
+    container_name: c1
+    environment:
+      RUST_LOG: "debug"
+      CONFIG_FILE: "/app/client-config.toml"
+      OMNIPAXOS_SERVER_ADDRESS: "s1:8000" # Overwrite server_address in client config TOML
+    volumes:
+      - ./client-1-config.toml:/app/client-config.toml
+      - ./logs/:/app/logs/
+  c2:
+    image: omnipaxos-client
+    container_name: c2
+    environment:
+      RUST_LOG: "debug"
+      CONFIG_FILE: "/app/client-config.toml"
+      OMNIPAXOS_SERVER_ADDRESS: "s2:8000" # Overwrite server_address in client config TOML
+    volumes:
+      - ./client-2-config.toml:/app/client-config.toml
+      - ./logs/:/app/logs/
+      
   db:
     image: postgres:latest
     restart: unless-stopped
