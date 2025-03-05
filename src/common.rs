@@ -148,7 +148,7 @@ pub mod utils {
     ) -> Result<SocketAddr, std::io::Error> {
         let dns_name = if is_local {
             // format!("s{node}:800{node}")
-            format!("localhost:800{node}")
+            format!("s{node}:800{node}")
         } else {
             format!("{cluster_name}-server-{node}.internal.zone.:800{node}")
         };
