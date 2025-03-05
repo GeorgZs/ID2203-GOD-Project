@@ -1,7 +1,7 @@
 location = "local-1"
 server_id = 1
 num_clients = 1 # Hardcoded number of client connections to wait for
-output_filepath = "../benchmarks/logs/local-run/server-1.json"
+output_filepath = "/var/log/omnipaxos/server-1.json"
 # Cluster-wide settings
 local_deployment = true # use localhost
 cluster_name = "local-cluster"

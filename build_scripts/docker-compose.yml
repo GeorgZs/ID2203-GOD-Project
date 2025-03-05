@@ -6,6 +6,7 @@ x-common-variables: &common-variables
 services:
   s1:
     image: omnipaxos-server
+    network_mode: host
     build:
       context: ./..
       dockerfile: omnipaxos_server/Dockerfile
@@ -14,29 +15,41 @@ services:
       <<: *common-variables
     volumes:
       - ./server-1-config.toml:/etc/omnipaxos/server-config.toml
+      - ../benchmarks/logs/local-run:/var/log/omnipaxos
     ports:
       - "8001:8001"
+    depends_on:
+      - db1
   s2:
     image: omnipaxos-server
+    network_mode: host
     container_name: s2
     environment:
       <<: *common-variables
     volumes:
       - ./server-2-config.toml:/etc/omnipaxos/server-config.toml
+      - ../benchmarks/logs/local-run:/var/log/omnipaxos
     ports:
       - "8002:8002"
+    depends_on:
+      - db2
   s3:
     image: omnipaxos-server
+    network_mode: host
     container_name: s3
     environment:
       <<: *common-variables
     volumes:
       - ./server-3-config.toml:/etc/omnipaxos/server-config.toml
+      - ../benchmarks/logs/local-run:/var/log/omnipaxos
     ports:
       - "8003:8003"
+    depends_on:
+      - db3
 
   c1:
     image: omnipaxos-client
+    network_mode: host
     build:
       context: ./..
       dockerfile: client.dockerfile
@@ -44,17 +57,18 @@ services:
     environment:
       RUST_LOG: "debug"
       CONFIG_FILE: "/app/client-config.toml"
-      OMNIPAXOS_SERVER_ADDRESS: "s1:8000" # Overwrite server_address in client config TOML
+      OMNIPAXOS_SERVER_ADDRESS: "s1:8001" # Overwrite server_address in client config TOML
     volumes:
       - ./client-1-config.toml:/app/client-config.toml
       - ./logs/:/app/logs/
   c2:
     image: omnipaxos-client
+    network_mode: host
     container_name: c2
     environment:
       RUST_LOG: "debug"
       CONFIG_FILE: "/app/client-config.toml"
-      OMNIPAXOS_SERVER_ADDRESS: "s2:8000" # Overwrite server_address in client config TOML
+      OMNIPAXOS_SERVER_ADDRESS: "s2:8002" # Overwrite server_address in client config TOML
     volumes:
       - ./client-2-config.toml:/app/client-config.toml
       - ./logs/:/app/logs/
