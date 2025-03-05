@@ -2,11 +2,12 @@ use crate::{data_collection::ClientData, network::Network};
 use chrono::Utc;
 use log::*;
 use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
-use rand::Rng;
+use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
 use omnipaxos_kv::common::ds::DataSourceQueryType::INSERT;
+use omnipaxos_kv::common::ds::QueryParams;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientConfig {
@@ -135,23 +136,39 @@ impl Client {
 
     async fn send_request(&mut self, is_write: bool) {
         //TODO!!
-        let ds_command = DataSourceCommand {
+        //randomly select ds_command as either insert or read
+
+        let write_ds_command = DataSourceCommand {
             query_type: DataSourceQueryType::INSERT,
-            data_source_object: DataSourceObject {
+            data_source_object: Some(DataSourceObject {
                 table_name: String::from("users"),
-                row_data: vec![RowData{
-                    row_name: String::from("name"),
-                    row_value: String::from("Mihhail")
-                },
+                row_data: vec![
+                    RowData{
+                        row_name: String::from("name"),
+                        row_value: String::from(random::<i32>().to_string())
+                    },
                 ]
-            }
+            }),
+            query_params: None,
         };
-        /*let key = self.next_request_id.to_string();
-        let cmd = match is_write {
-            true => KVCommand::Put(key.clone(), key),
-            false => KVCommand::Get(key),
-        };*/
-        let request = ClientMessage::Append(self.next_request_id, ds_command);
+
+        let read_ds_command = DataSourceCommand {
+            query_type: DataSourceQueryType::READ,
+            data_source_object: None,
+            query_params: Some(QueryParams {
+                table_name: String::from("users"),
+                select_all: true,
+                select_columns: None,
+            }),
+        };
+
+        let request;
+
+        match is_write {
+            true => request = ClientMessage::Append(self.next_request_id, write_ds_command),
+            false => request = ClientMessage::Append(self.next_request_id, read_ds_command),
+        };
+
         debug!("Sending {request:?}");
         self.network.send(self.active_server, request).await;
         self.client_data.new_request(is_write);

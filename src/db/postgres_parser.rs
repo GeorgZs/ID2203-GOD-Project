@@ -1,5 +1,5 @@
 use crate::db::query_parser::Parse;
-use crate::common::ds::DataSourceObject;
+use crate::common::ds::{DataSourceObject, QueryParams};
 
 pub struct PGParser {
     query_string: Vec<String> //have a list of past queries
@@ -44,7 +44,7 @@ impl Parse for PGParser {
         query_string
     }
     // fn parse_update(object: DataSourceObject) -> String {}
-    fn parse_read(&mut self, object: DataSourceObject) -> String {
+    fn parse_read(&mut self, object: QueryParams) -> String {
         let mut query_string = String::from("SELECT * FROM ");
         query_string.push_str(&object.table_name);
         query_string.push_str(";");

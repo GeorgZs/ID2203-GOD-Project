@@ -1,4 +1,4 @@
-use omnipaxos_kv::common::ds::DataSourceCommand;
+use omnipaxos_kv::common::ds::{DataSourceCommand, DataSourceQueryType};
 use std::collections::HashMap;
 use omnipaxos_kv::db::postgres_connection::PGConnection;
 use omnipaxos_kv::db::postgres_parser::PGParser;
@@ -22,7 +22,8 @@ impl Database {
 
     pub async fn handle_command(&mut self, command: DataSourceCommand) -> Option<Option<String>> {
         //TODO!!
-        Repository::query(&self.db, self.parser.parse_dso(command).as_str(), "write").await.expect("TODO: panic message");
+        let query_type = command.query_type.clone();
+        Repository::query(&self.db, self.parser.parse_dso(command).as_str(), query_type).await.expect("TODO: panic message");
 
         /*match command {
             DataSourceCommand::Put(key, value) => {

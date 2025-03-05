@@ -79,8 +79,17 @@ pub mod ds {
 
     #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
     pub struct DataSourceCommand {
-        pub data_source_object: DataSourceObject,
-        pub query_type: DataSourceQueryType
+        pub data_source_object: Option<DataSourceObject>,
+        pub query_type: DataSourceQueryType,
+        pub query_params: Option<QueryParams>,
+    }
+
+    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    pub struct QueryParams {
+        pub table_name: String,
+        pub select_all: bool,
+        pub select_columns: Option<Vec<String>>,
+        //SELECT * from table_name
     }
 
     /*#[derive(Clone, Debug, Serialize, Deserialize)]
