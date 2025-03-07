@@ -41,7 +41,7 @@ pub async fn main() {
 
     let command = Command {
       client_id: 1,
-      coordinator_id: args.node,
+      coordinator_id: 1,
       id: 1,
       ds_cmd: ds_command
     };
@@ -57,17 +57,23 @@ pub async fn main() {
 
     // March statement to a node, match it to a 
 
+
     let network_result = Network::new(
       String::from("empty"),
-      vec![args.node],
+      vec![1,2,3],
       LOCAL_DEPLOYMENT,
       NETWORK_BATCH_SIZE
     ).await;
 
+    print!("Before match");
+
     match network_result {
       mut network => {
         println!("Network created");
-        network.send(args.node, client_message).await;
+        network.send(1, client_message).await;
       },
+      _ => {
+        print!("D");
+      }
     }
 }

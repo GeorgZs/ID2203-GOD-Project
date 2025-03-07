@@ -60,6 +60,9 @@ services:
       - servers-network
     ports:
       - "8080:8080"
+    depends_on:
+      - s1
+    
   # c1:
   #   image: omnipaxos-client
   #   build:

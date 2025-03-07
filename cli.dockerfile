@@ -21,7 +21,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo run --bin cli -- --node 1 --consistency "Local" --action "SELECT * FROM users;"
+RUN cargo build --bin cli -- --node 1 --consistency "Local" --action "SELECT * FROM users;"
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
