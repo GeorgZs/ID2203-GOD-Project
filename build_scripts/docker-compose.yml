@@ -68,6 +68,7 @@ services:
     volumes:
       - ./client-1-config.toml:/app/client-config.toml
       - ./logs/:/app/logs/
+      - ../benchmarks/logs/local-run:/var/log/omnipaxos
     depends_on:
       - s1
 
@@ -83,6 +84,7 @@ services:
     volumes:
       - ./client-2-config.toml:/app/client-config.toml
       - ./logs/:/app/logs/
+      - ../benchmarks/logs/local-run/:/var/log/omnipaxos/
     depends_on:
       - s2
       
