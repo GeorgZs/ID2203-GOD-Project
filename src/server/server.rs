@@ -187,8 +187,8 @@ impl OmniPaxosServer {
                 ClientMessage::Append(command_id, kv_command) => {
                     self.append_to_log(from, command_id, kv_command)
                 }
-                ClientMessage::Read(request_identifier, consistency_level, datasource_command) => {
-                    self.handle_datasource_command(request_identifier, consistency_level, datasource_command)
+                ClientMessage::Read(request_identifier, consistency_level, command) => {
+                    self.handle_datasource_command(request_identifier, consistency_level, command).await
                 }
             }
         }
@@ -205,6 +205,31 @@ impl OmniPaxosServer {
                 }
                 ClusterMessage::LeaderStartSignal(start_time) => {
                     self.send_client_start_signals(start_time)
+                }
+                ClusterMessage::ReadRequest(request_identifier, consistency_level, command) => {
+                    info!("{}: Node: {}, as the leader, I am querying database of server: {}", request_identifier, self.id, self.id);
+                    let res = self.database.handle_command(command.ds_cmd).await;
+                    match res {
+                        Some(opt) => {
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, opt))
+                        }
+                        None => {
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, None))
+                        }
+                    }
+                }
+                ClusterMessage::ReadResponse(request_identifier, consistency_level, client_id, response_option) => {
+                    match consistency_level {
+                        ConsistencyLevel::Leader => {
+                            self.network.send_to_client(client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, response_option))
+                        }
+                        ConsistencyLevel::Linearizable => {
+                            //TODO Implement
+                        }
+                        ConsistencyLevel::Local => {
+                            // TODO can't happen
+                        }
+                    }
                 }
             }
         }
@@ -246,7 +271,45 @@ impl OmniPaxosServer {
         Ok(())
     }
 
-    fn handle_datasource_command(&self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, datasource_command: DataSourceCommand) {
-        todo!();
+    async fn handle_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
+        match consistency_level {
+            ConsistencyLevel::Local => {
+                info!("{}: Node: {}, Received local command, querying database of server: {}", request_identifier, self.id, self.id);
+                self.handle_local_datasource_command(request_identifier, consistency_level, command).await
+            }
+            ConsistencyLevel::Leader => {
+                let leader_option = self.omnipaxos.get_current_leader();
+                match leader_option {
+                    Some((leader_id, _)) => {
+                        if (self.id == leader_id) {
+                            info!("{}: Node: {}, Received leader command, I am the leader, querying database of server: {}", request_identifier, self.id, self.id);
+                            self.handle_local_datasource_command(request_identifier, consistency_level, command).await
+                        } else {
+                            info!("{}: Node: {}, Received leader command, leader is server: {}", request_identifier, self.id, leader_id);
+                            self.network.send_to_cluster(leader_id, ClusterMessage::ReadRequest(request_identifier, consistency_level, command))
+                        }
+                    }
+                    None => {
+                        warn!("{}: Node: {}, Received leader command, no leader is available", request_identifier, self.id);
+                        //TODO Check what should happen here
+                    }
+                }
+            }
+            ConsistencyLevel::Linearizable => {
+                //TODO !!!
+            }
+        }
+    }
+
+    async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
+        let res = self.database.handle_command(command.ds_cmd).await;
+        match res {
+            Some(opt) => {
+                self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, opt))
+            }
+            None => {
+                self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, None))
+            }
+        }
     }
 }
