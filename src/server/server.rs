@@ -19,6 +19,7 @@ const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
 
 struct ResponseValue {
+    current_idx: usize,
     value: Option<String>
 }
 
@@ -218,21 +219,21 @@ impl OmniPaxosServer {
                     let res = self.database.handle_command(command.ds_cmd).await;
                     match res {
                         Some(opt) => {
-                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, opt))
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, self.current_decided_idx, opt))
                         }
                         None => {
-                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, None))
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, self.current_decided_idx, None))
                         }
                     }
                 }
-                ClusterMessage::ReadResponse(request_identifier, consistency_level, client_id, response_option) => {
+                ClusterMessage::ReadResponse(request_identifier, consistency_level, client_id, current_decided_idx, response_option) => {
                     match consistency_level {
                         ConsistencyLevel::Leader => {
                             self.network.send_to_client(client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, response_option))
                         }
                         ConsistencyLevel::Linearizable => {
                             if let Some(requests) = self.read_requests.get_mut(&request_identifier) {
-                                requests.push(ResponseValue { value: response_option });
+                                requests.push(ResponseValue { current_idx: current_decided_idx, value: response_option });
                                 let number_of_responses = requests.len();
                                 let majority = (self.peers.len() + 1) / 2;
                                 if number_of_responses > majority {
@@ -318,7 +319,7 @@ impl OmniPaxosServer {
             ConsistencyLevel::Linearizable => {
                 info!("{}: Node: {}, Received linearizable command, sending read request to all peers", request_identifier, self.id);
                 let res = self.get_local_result(command.clone().ds_cmd).await;
-                self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { value: res }]);
+                self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { current_idx: self.current_decided_idx, value: res }]);
                 for peer in &self.peers {
                     self.network.send_to_cluster(*peer, ClusterMessage::ReadRequest(request_identifier.clone(), consistency_level.clone(), command.clone()))
                 }
@@ -339,7 +340,11 @@ impl OmniPaxosServer {
     }
 
     fn get_linearizable_response(&self, request_identifier: RequestIdentifier) -> Option<String> {
-        //TODO get actual linearizable value.
-        self.read_requests.get(&request_identifier.clone()).unwrap().get(0).unwrap().value.clone()
+        if let Some(response) = self.read_requests.get(&request_identifier.clone())
+            .and_then(|responses| responses.iter().max_by_key(|r| r.current_idx)) {
+            response.value.clone()
+        } else {
+            None
+        }
     }
 }
