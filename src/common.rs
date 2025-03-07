@@ -20,7 +20,7 @@ pub mod messages {
         OmniPaxosMessage(OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
         ReadRequest(RequestIdentifier, ConsistencyLevel, Command),
-        ReadResponse(RequestIdentifier, ConsistencyLevel, ClientId, Option<String>)
+        ReadResponse(RequestIdentifier, ConsistencyLevel, ClientId, usize, Option<String>)
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
