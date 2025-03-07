@@ -1,7 +1,7 @@
 pub mod messages {
     use omnipaxos::{messages::Message as OmniPaxosMessage, util::NodeId};
     use serde::{Deserialize, Serialize};
-
+    use crate::common::ds::ClientId;
     use super::{
         ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
@@ -19,6 +19,8 @@ pub mod messages {
     pub enum ClusterMessage {
         OmniPaxosMessage(OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
+        ReadRequest(RequestIdentifier, ConsistencyLevel, Command),
+        ReadResponse(RequestIdentifier, ConsistencyLevel, ClientId, Option<String>)
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -31,7 +33,7 @@ pub mod messages {
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
         Append(CommandId, DataSourceCommand),
-        Read(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
+        Read(RequestIdentifier, ConsistencyLevel, Command),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -39,6 +41,7 @@ pub mod messages {
         Write(CommandId),
         Read(CommandId, Option<String>),
         StartSignal(Timestamp),
+        ReadResponse(RequestIdentifier, ConsistencyLevel, Option<String>)
     }
 
     impl ServerMessage {
@@ -47,6 +50,7 @@ pub mod messages {
                 ServerMessage::Write(id) => *id,
                 ServerMessage::Read(id, _) => *id,
                 ServerMessage::StartSignal(_) => unimplemented!(),
+                ServerMessage::ReadResponse(_, _, _) => unimplemented!()
             }
         }
     }
