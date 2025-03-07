@@ -11,11 +11,16 @@ use omnipaxos::{
 use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use std::{fs::File, io::Write, time::Duration};
+use std::collections::HashMap;
 
 type OmniPaxosInstance = OmniPaxos<Command, MemoryStorage<Command>>;
 const NETWORK_BATCH_SIZE: usize = 100;
 const LEADER_WAIT: Duration = Duration::from_secs(1);
 const ELECTION_TIMEOUT: Duration = Duration::from_secs(1);
+
+struct ResponseValue {
+    value: Option<String>
+}
 
 pub struct OmniPaxosServer {
     id: NodeId,
@@ -27,6 +32,7 @@ pub struct OmniPaxosServer {
     output_file: File,
     config: OmniPaxosServerConfig,
     peers: Vec<NodeId>,
+    read_requests: HashMap<RequestIdentifier, Vec<ResponseValue>>
 }
 
 impl OmniPaxosServer {
@@ -69,6 +75,7 @@ impl OmniPaxosServer {
             output_file,
             peers: config.get_peers(config.server_id),
             config,
+            read_requests: HashMap::new()
         };
         // Save config to output file
         server.save_output().expect("Failed to write to file");
@@ -207,7 +214,7 @@ impl OmniPaxosServer {
                     self.send_client_start_signals(start_time)
                 }
                 ClusterMessage::ReadRequest(request_identifier, consistency_level, command) => {
-                    info!("{}: Node: {}, as the leader, I am querying database of server: {}", request_identifier, self.id, self.id);
+                    info!("{}: Node: {}, as requested, I am querying database of server: {}", request_identifier, self.id, self.id);
                     let res = self.database.handle_command(command.ds_cmd).await;
                     match res {
                         Some(opt) => {
@@ -224,7 +231,20 @@ impl OmniPaxosServer {
                             self.network.send_to_client(client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, response_option))
                         }
                         ConsistencyLevel::Linearizable => {
-                            //TODO Implement
+                            if let Some(requests) = self.read_requests.get_mut(&request_identifier) {
+                                requests.push(ResponseValue { value: response_option });
+                                let number_of_responses = requests.len();
+                                let majority = (self.peers.len() + 1) / 2;
+                                if number_of_responses > majority {
+                                    info!("{}: Node: {}, After receiving {} responses for number of nodes: {}, we can respond with the linearizable answer",
+                                        request_identifier, self.id, number_of_responses, self.peers.len() + 1);
+                                    let linearizable_response = self.get_linearizable_response(request_identifier.clone());
+                                    self.network.send_to_client(
+                                        client_id,
+                                        ServerMessage::ReadResponse(request_identifier, consistency_level, linearizable_response),
+                                    );
+                                }
+                            }
                         }
                         ConsistencyLevel::Local => {
                             // TODO can't happen
@@ -296,20 +316,30 @@ impl OmniPaxosServer {
                 }
             }
             ConsistencyLevel::Linearizable => {
-                //TODO !!!
+                info!("{}: Node: {}, Received linearizable command, sending read request to all peers", request_identifier, self.id);
+                let res = self.get_local_result(command.clone().ds_cmd).await;
+                self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { value: res }]);
+                for peer in &self.peers {
+                    self.network.send_to_cluster(*peer, ClusterMessage::ReadRequest(request_identifier.clone(), consistency_level.clone(), command.clone()))
+                }
             }
         }
     }
 
-    async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
-        let res = self.database.handle_command(command.ds_cmd).await;
+    async fn get_local_result(&mut self, data_source_command: DataSourceCommand) -> Option<String> {
+        let res = self.database.handle_command(data_source_command).await;
         match res {
-            Some(opt) => {
-                self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, opt))
-            }
-            None => {
-                self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, None))
-            }
+            Some(r) => { r }
+            None => { None }
         }
+    }
+    async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
+        let res = self.get_local_result(command.ds_cmd).await;
+        self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, res))
+    }
+
+    fn get_linearizable_response(&self, request_identifier: RequestIdentifier) -> Option<String> {
+        //TODO get actual linearizable value.
+        self.read_requests.get(&request_identifier.clone()).unwrap().get(0).unwrap().value.clone()
     }
 }
