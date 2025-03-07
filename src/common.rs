@@ -20,8 +20,16 @@ pub mod messages {
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub enum ConsistencyLevel {
+        Local,
+        Leader,
+        Linearizable
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
         Append(CommandId, DataSourceCommand),
+        Read(ConsistencyLevel, DataSourceCommand),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]

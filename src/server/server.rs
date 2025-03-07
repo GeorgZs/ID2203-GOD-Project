@@ -187,6 +187,9 @@ impl OmniPaxosServer {
                 ClientMessage::Append(command_id, kv_command) => {
                     self.append_to_log(from, command_id, kv_command)
                 }
+                ClientMessage::Read(consistency_level, datasource_command) => {
+                    self.handle_datasource_command(consistency_level, datasource_command)
+                }
             }
         }
         self.send_outgoing_msgs();
@@ -241,5 +244,9 @@ impl OmniPaxosServer {
         self.output_file.write_all(config_json.as_bytes())?;
         self.output_file.flush()?;
         Ok(())
+    }
+
+    fn handle_datasource_command(consistency_level: ConsistencyLevel, datasource_command: DataSourceCommand) {
+        todo!();
     }
 }
