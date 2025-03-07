@@ -187,7 +187,7 @@ impl OmniPaxosServer {
                 ClientMessage::Append(command_id, kv_command) => {
                     self.append_to_log(from, command_id, kv_command)
                 }
-                ClientMessage::Read(consistency_level, datasource_command) => {
+                ClientMessage::Read(request_identifier, consistency_level, datasource_command) => {
                     self.handle_datasource_command(consistency_level, datasource_command)
                 }
             }

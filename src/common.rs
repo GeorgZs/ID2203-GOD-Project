@@ -7,6 +7,8 @@ pub mod messages {
         utils::Timestamp,
     };
 
+    pub type RequestIdentifier = String;
+
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum RegistrationMessage {
         NodeRegister(NodeId),
@@ -29,7 +31,7 @@ pub mod messages {
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
         Append(CommandId, DataSourceCommand),
-        Read(ConsistencyLevel, DataSourceCommand),
+        Read(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
