@@ -1,7 +1,7 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
 use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}, utils::get_node_addr};
-use crate::{network::Network};
+use crate::network::Network;
 
 #[derive(Debug)]
 enum PortLookup{
@@ -16,7 +16,7 @@ enum PortLookup{
 struct Args {
     /// Name of the person to greet
     #[arg(short, long, default_value_t = 1)]
-    node: u8,
+    node: u64,
 
     /// Number of times to greet
     #[arg(short, long, default_value_t = String::from("local"))]
@@ -26,7 +26,10 @@ struct Args {
     action: String,
 }
 
-fn main() {
+mod network;
+
+#[tokio::main]
+pub async fn main() {
     let args = Args::parse();
 
     let unique_identifier =Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
@@ -66,16 +69,10 @@ fn main() {
         _ => get_node_addr(&String::from("empty"), 1, true),
       };
 
-      let network = Netwo::new(
-        &String::from("empty"),
+      let network = Network::new(
+        String::from("empty"),
         vec![args.node],
         true,
         100
-      ).await;
-
-
-
-
-    
-    
+      ).await;   
 }
