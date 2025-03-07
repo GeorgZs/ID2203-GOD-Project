@@ -3,30 +3,22 @@ use rand::distributions::{Alphanumeric, DistString};
 use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}, utils::get_node_addr};
 use crate::network::Network;
 
-#[derive(Debug)]
-enum PortLookup{
-    S1 = 8001,
-    S2 = 8002,
-    S3 = 8003
-  }
+mod network;
 
-/// Simple program to greet a person
-#[derive(Parser, Debug)]
+#[derive(Debug)]
+
+#[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
     #[arg(short, long, default_value_t = 1)]
     node: u64,
 
-    /// Number of times to greet
     #[arg(short, long, default_value_t = String::from("local"))]
     consistency: String,
 
     #[arg(short, long)]
     action: String,
 }
-
-mod network;
 
 #[tokio::main]
 pub async fn main() {
@@ -55,24 +47,20 @@ pub async fn main() {
 
     // March statement to a node, match it to a 
 
-    let address = match args.node {
-        1 => format!("s1:{:?}",PortLookup::S1),
-        2 => format!("s2:{:?}",PortLookup::S2),
-        3 => format!("s3:{:?}",PortLookup::S3),
-        _ => format!("s1:{:?}",PortLookup::S1),
-      };
+    let network_result = Network::new(
+      String::from("empty"),
+      vec![args.node],
+      true,
+      100
+    ).await;
 
-      let address = match args.node {
-        1 => get_node_addr(&String::from("empty"), 1, true),
-        2 => get_node_addr(&String::from("empty"), 2, true),
-        3 => get_node_addr(&String::from("empty"), 3, true),
-        _ => get_node_addr(&String::from("empty"), 1, true),
-      };
+    match network_result {
+      mut network => {
+        println!("Network created");
+        network.send(args.node, client_message).await;
+      },
+    }
 
-      let network = Network::new(
-        String::from("empty"),
-        vec![args.node],
-        true,
-        100
-      ).await;   
+   
+
 }
