@@ -1,10 +1,12 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
-use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}, utils::get_node_addr};
+use omnipaxos_kv::common::{ds::{Command, DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}, utils::get_node_addr};
 use crate::network::Network;
 
 mod network;
 
+const NETWORK_BATCH_SIZE: usize = 100;
+const LOCAL_DEPLOYMENT: bool = true;
 #[derive(Debug)]
 
 #[derive(Parser)]
@@ -24,6 +26,7 @@ struct Args {
 pub async fn main() {
     let args = Args::parse();
 
+
     let unique_identifier =Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
     let ds_command = DataSourceCommand {
@@ -36,6 +39,13 @@ pub async fn main() {
         }),
     };
 
+    let command = Command {
+      client_id: 1,
+      coordinator_id: args.node,
+      id: 1,
+      ds_cmd: ds_command
+    };
+
     let consistency_level: ConsistencyLevel = match args.consistency.as_str() {
         "local" => ConsistencyLevel::Local,
         "leader" => ConsistencyLevel::Leader,
@@ -43,15 +53,15 @@ pub async fn main() {
         _ => ConsistencyLevel::Local,
     };
 
-    let client_message = ClientMessage::Read(unique_identifier, consistency_level, ds_command);
+    let client_message = ClientMessage::Read(unique_identifier, consistency_level, command);
 
     // March statement to a node, match it to a 
 
     let network_result = Network::new(
       String::from("empty"),
       vec![args.node],
-      true,
-      100
+      LOCAL_DEPLOYMENT,
+      NETWORK_BATCH_SIZE
     ).await;
 
     match network_result {
@@ -60,7 +70,4 @@ pub async fn main() {
         network.send(args.node, client_message).await;
       },
     }
-
-   
-
 }
