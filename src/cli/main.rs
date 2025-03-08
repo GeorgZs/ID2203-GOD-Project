@@ -77,7 +77,6 @@ pub async fn main() {
               // Self::wait_until_sync_time(&mut self.config, start_time).await;
               println!("Read response {:?}", opt_res);
           }
-            Some(ServerMessage::StartSignal())
           _ => panic!("Error waiting for start signal"),
         }
       },
