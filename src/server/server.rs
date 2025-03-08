@@ -190,12 +190,14 @@ impl OmniPaxosServer {
     }
 
     async fn handle_client_messages(&mut self, messages: &mut Vec<(ClientId, ClientMessage)>) {
+        println!("Receiving client message: {:?}", messages);
         for (from, message) in messages.drain(..) {
             match message {
                 ClientMessage::Append(command_id, kv_command) => {
                     self.append_to_log(from, command_id, kv_command)
                 }
                 ClientMessage::Read(request_identifier, consistency_level, command) => {
+                    println!("Read received!");
                     self.handle_datasource_command(request_identifier, consistency_level, command).await
                 }
             }

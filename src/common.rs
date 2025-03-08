@@ -170,14 +170,11 @@ pub mod utils {
         is_local: bool,
     ) -> Result<SocketAddr, std::io::Error> {
         let dns_name: String = if is_local {
-            // format!("s{node}:800{node}")
             format!("s{node}:800{node}")
         } else {
             format!("{cluster_name}-server-{node}.internal.zone.:800{node}")
         };
-        println!("DNS HOLA {:?}", dns_name);
         let address = dns_name.to_socket_addrs()?.next().unwrap();
-        println!("ADDRESS HOLA {:?}", address);
         Ok(address)
     }
 

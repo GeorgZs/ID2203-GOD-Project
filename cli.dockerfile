@@ -21,10 +21,14 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo build --bin cli -- --node 1 --consistency "Local" --action "SELECT * FROM users;"
+RUN cargo build --release --bin cli
 
 FROM debian:bookworm-slim AS runtime
 WORKDIR /app
 COPY --from=builder /app/target/release/cli /usr/local/bin
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/cli"]
+WORKDIR /usr/local/bin
+# Tail an empty file indefinitely
+ENTRYPOINT ["tail", "-f", "/dev/null"]
+
+#ENTRYPOINT ["./cli --node 1 --consistency 'local' --action 'SELECT * FROM users;'"]

@@ -47,14 +47,11 @@ impl Network {
     }
 
     async fn initialize_connections(&mut self, server_ids: Vec<NodeId>) {
-        println!("Server Ids: {:?}", server_ids);
         info!("Establishing server connections");
         let mut connection_tasks = Vec::with_capacity(server_ids.len());
-        println!("Connection tasks: {:?}", connection_tasks);
         for server_id in &server_ids {
             let server_address = get_node_addr(&self.cluster_name, *server_id, self.is_local)
                 .expect("Couldn't resolve server IP");
-            println!("Server address: {:?}", server_address);
             let task = tokio::spawn(Self::get_server_connection(*server_id, server_address));
             connection_tasks.push(task);
         }
