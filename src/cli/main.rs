@@ -66,11 +66,8 @@ pub async fn main() {
         NETWORK_BATCH_SIZE
     ).await;
 
-    print!("Before match");
-
     match network_result {
       mut network => {
-        println!("Network created");
         network.send(1, client_message).await;
 
         match network.server_messages.recv().await {

@@ -60,7 +60,6 @@ impl Network {
             connection_tasks.push(task);
         }
         let finished_tasks = futures::future::join_all(connection_tasks).await;
-        println!("Finished tasks {:?}", finished_tasks);
         for (i, result) in finished_tasks.into_iter().enumerate() {
             match result {
                 Ok((from_server_conn, to_server_conn)) => {

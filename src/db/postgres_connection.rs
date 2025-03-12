@@ -27,8 +27,6 @@ impl DataSourceConnection for PGConnection {
     }
 
     async fn read(&self, query_string: &str) {
-        // todo!();
-        println!("Reading from database!");
         let output = sqlx::query(query_string).fetch_all(&self.pool).await;
 
         match output {

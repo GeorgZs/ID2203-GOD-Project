@@ -217,7 +217,6 @@ impl OmniPaxosServer {
                     self.append_to_log(from, command_id, kv_command)
                 }
                 ClientMessage::Read(request_identifier, consistency_level, command) => {
-                    println!("Read received!");
                     self.handle_datasource_command(request_identifier, consistency_level, command).await
                 }
             }
@@ -226,11 +225,9 @@ impl OmniPaxosServer {
     }
 
     async fn handle_cli_client_messages(&mut self, messages: &mut Vec<(RequestIdentifier, ClientMessage)>) {
-        println!("Receiving cli client message: {:?}", messages);
         for (_, message) in messages.drain(..) {
             match message {
                 ClientMessage::Read(request_identifier, consistency_level, command) => {
-                    println!("Read received!");
                     self.handle_datasource_command(request_identifier, consistency_level, command).await
                 }
                 _ => {
@@ -264,10 +261,10 @@ impl OmniPaxosServer {
                         }
                     }
                 }
-                ClusterMessage::ReadResponse(request_identifier, consistency_level, client_id, current_decided_idx, response_option) => {
+                ClusterMessage::ReadResponse(request_identifier, consistency_level, _, current_decided_idx, response_option) => {
                     match consistency_level {
                         ConsistencyLevel::Leader => {
-                            self.network.send_to_client(client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, response_option))
+                            self.cli_network.send_to_cli_client(request_identifier.clone(), ServerMessage::ReadResponse(request_identifier, consistency_level, response_option)).await;
                         }
                         ConsistencyLevel::Linearizable => {
                             if let Some(requests) = self.read_requests.get_mut(&request_identifier) {
@@ -278,10 +275,9 @@ impl OmniPaxosServer {
                                     info!("{}: Node: {}, After receiving {} responses for number of nodes: {}, we can respond with the linearizable answer",
                                         request_identifier, self.id, number_of_responses, self.peers.len() + 1);
                                     let linearizable_response = self.get_linearizable_response(request_identifier.clone());
-                                    self.network.send_to_client(
-                                        client_id,
+                                    self.cli_network.send_to_cli_client(request_identifier.clone(),
                                         ServerMessage::ReadResponse(request_identifier, consistency_level, linearizable_response),
-                                    );
+                                    ).await;
                                 }
                             }
                         }
@@ -374,7 +370,7 @@ impl OmniPaxosServer {
     }
     async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
         let res = self.get_local_result(command.ds_cmd).await;
-        self.network.send_to_client(command.client_id, ServerMessage::ReadResponse(request_identifier, consistency_level, res))
+        self.cli_network.send_to_cli_client(request_identifier.clone(), ServerMessage::ReadResponse(request_identifier, consistency_level, res)).await;
     }
 
     fn get_linearizable_response(&self, request_identifier: RequestIdentifier) -> Option<String> {
