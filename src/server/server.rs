@@ -12,6 +12,8 @@ use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use std::{fs::File, io::Write, time::Duration};
 use std::collections::HashMap;
+use std::sync::Arc;
+use crate::network::CliNetwork;
 
 type OmniPaxosInstance = OmniPaxos<Command, MemoryStorage<Command>>;
 const NETWORK_BATCH_SIZE: usize = 100;
@@ -27,6 +29,7 @@ pub struct OmniPaxosServer {
     id: NodeId,
     database: Database,
     network: Network,
+    cli_network: Arc<CliNetwork>,
     omnipaxos: OmniPaxosInstance,
     current_decided_idx: usize,
     omnipaxos_msg_buffer: Vec<Message<Command>>,
@@ -63,6 +66,8 @@ impl OmniPaxosServer {
             NETWORK_BATCH_SIZE,
         )
         .await;
+
+        let cli_network = CliNetwork::new(config.server_id, NETWORK_BATCH_SIZE);
         let output_file = File::create(config.output_filepath.clone()).unwrap();
 
         let db_config = config.db_config.clone();
@@ -70,6 +75,7 @@ impl OmniPaxosServer {
             id: config.server_id,
             database: Database::new(db_config).await,
             network,
+            cli_network: Arc::new(cli_network),
             omnipaxos,
             current_decided_idx: 0,
             omnipaxos_msg_buffer,
@@ -85,6 +91,7 @@ impl OmniPaxosServer {
 
     pub async fn run(&mut self) {
         let mut client_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
+        let mut cli_client_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
         let mut cluster_msg_buf = Vec::with_capacity(NETWORK_BATCH_SIZE);
         // We don't use Omnipaxos leader election and instead force an initial leader
         // Once the leader is established it chooses a synchronization point which the
@@ -96,9 +103,16 @@ impl OmniPaxosServer {
             self.send_cluster_start_signals(experiment_sync_start);
             self.send_client_start_signals(experiment_sync_start);
         }
+        let cloned_cli_network = Arc::clone(&self.cli_network);
+        tokio::spawn({
+            async move {
+                cloned_cli_network.listen_to_connections().await;
+            }
+        });
         // Main event loop
         let mut election_interval = tokio::time::interval(ELECTION_TIMEOUT);
         loop {
+            let cli_net_clone = Arc::clone(&self.cli_network);
             tokio::select! {
                 _ = election_interval.tick() => {
                     self.omnipaxos.tick();
@@ -109,6 +123,12 @@ impl OmniPaxosServer {
                 },
                 _ = self.network.client_messages.recv_many(&mut client_msg_buf, NETWORK_BATCH_SIZE) => {
                     self.handle_client_messages(&mut client_msg_buf).await;
+                },
+                _ = async {
+                    let mut client_messages = cli_net_clone.cli_client_messages.lock().await;
+                    client_messages.recv_many(&mut cli_client_msg_buf, NETWORK_BATCH_SIZE).await
+                } => {
+                    self.handle_cli_client_messages(&mut cli_client_msg_buf).await;
                 },
             }
         }
@@ -199,6 +219,22 @@ impl OmniPaxosServer {
                 ClientMessage::Read(request_identifier, consistency_level, command) => {
                     println!("Read received!");
                     self.handle_datasource_command(request_identifier, consistency_level, command).await
+                }
+            }
+        }
+        self.send_outgoing_msgs();
+    }
+
+    async fn handle_cli_client_messages(&mut self, messages: &mut Vec<(RequestIdentifier, ClientMessage)>) {
+        println!("Receiving cli client message: {:?}", messages);
+        for (_, message) in messages.drain(..) {
+            match message {
+                ClientMessage::Read(request_identifier, consistency_level, command) => {
+                    println!("Read received!");
+                    self.handle_datasource_command(request_identifier, consistency_level, command).await
+                }
+                _ => {
+                    error!("Cli Client Send a non-read command");
                 }
             }
         }

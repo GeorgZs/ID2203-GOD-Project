@@ -65,40 +65,40 @@ services:
       - s2
       - s3
     
-  # c1:
-  #   image: omnipaxos-client
-  #   build:
-  #     context: ./..
-  #     dockerfile: client.dockerfile
-  #   container_name: c1
-  #   environment:
-  #     RUST_LOG: "debug"
-  #     CONFIG_FILE: "/app/client-config.toml"
-  #     OMNIPAXOS_SERVER_ADDRESS: "s1:8001" # Overwrite server_address in client config TOML
-  #   networks:
-  #     - servers-network
-  #   volumes:
-  #     - ./client-1-config.toml:/app/client-config.toml
-  #     - ./logs/:/app/logs/
-  #     - ../benchmarks/logs/local-run:/var/log/omnipaxos
-  #   depends_on:
-  #     - s1
+  c1:
+    image: omnipaxos-client
+    build:
+      context: ./..
+      dockerfile: client.dockerfile
+    container_name: c1
+    environment:
+      RUST_LOG: "debug"
+      CONFIG_FILE: "/app/client-config.toml"
+      OMNIPAXOS_SERVER_ADDRESS: "s1:8001" # Overwrite server_address in client config TOML
+    networks:
+      - servers-network
+    volumes:
+      - ./client-1-config.toml:/app/client-config.toml
+      - ./logs/:/app/logs/
+      - ../benchmarks/logs/local-run:/var/log/omnipaxos
+    depends_on:
+      - s1
 
-  # c2:
-  #   image: omnipaxos-client
-  #   container_name: c2
-  #   environment:
-  #     RUST_LOG: "debug"
-  #     CONFIG_FILE: "/app/client-config.toml"
-  #     OMNIPAXOS_SERVER_ADDRESS: "s2:8002" # Overwrite server_address in client config TOML
-  #   networks:
-  #     - servers-network
-  #   volumes:
-  #     - ./client-2-config.toml:/app/client-config.toml
-  #     - ./logs/:/app/logs/
-  #     - ../benchmarks/logs/local-run/:/var/log/omnipaxos/
-  #   depends_on:
-  #     - s2
+  c2:
+    image: omnipaxos-client
+    container_name: c2
+    environment:
+      RUST_LOG: "debug"
+      CONFIG_FILE: "/app/client-config.toml"
+      OMNIPAXOS_SERVER_ADDRESS: "s2:8002" # Overwrite server_address in client config TOML
+    networks:
+      - servers-network
+    volumes:
+      - ./client-2-config.toml:/app/client-config.toml
+      - ./logs/:/app/logs/
+      - ../benchmarks/logs/local-run/:/var/log/omnipaxos/
+    depends_on:
+      - s2
       
 
   db1:

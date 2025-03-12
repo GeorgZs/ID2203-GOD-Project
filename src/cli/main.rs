@@ -1,7 +1,7 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
 use omnipaxos_kv::common::{ds::{Command, DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
-use omnipaxos_kv::common::messages::{ServerMessage};
+use omnipaxos_kv::common::messages::{RequestIdentifier, ServerMessage};
 use crate::network::Network;
 
 mod network;
@@ -54,15 +54,16 @@ pub async fn main() {
         _ => ConsistencyLevel::Local,
     };
 
-    let client_message = ClientMessage::Read(unique_identifier, consistency_level, command);
+    let client_message = ClientMessage::Read(unique_identifier.clone(), consistency_level, command);
 
     // March statement to a node, match it to a
 
     let network_result = Network::new(
-      String::from("empty"),
-      vec![1,2,3],
-      LOCAL_DEPLOYMENT,
-      NETWORK_BATCH_SIZE
+        unique_identifier as RequestIdentifier,
+        String::from("empty"),
+        vec![1,2,3],
+        LOCAL_DEPLOYMENT,
+        NETWORK_BATCH_SIZE
     ).await;
 
     print!("Before match");

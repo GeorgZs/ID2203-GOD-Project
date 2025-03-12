@@ -12,6 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 pub struct Network {
     cluster_name: String,
+    request_identifier: RequestIdentifier,
     is_local: bool,
     server_connections: Vec<Option<ServerConnection>>,
     batch_size: usize,
@@ -24,6 +25,7 @@ const RETRY_SERVER_CONNECTION_TIMEOUT: Duration = Duration::from_secs(1);
 
 impl Network {
     pub async fn new(
+        request_identifier: RequestIdentifier,
         cluster_name: String,
         server_ids: Vec<NodeId>,
         local_deployment: bool,
@@ -35,6 +37,7 @@ impl Network {
         let (server_message_sender, server_messages) = channel(batch_size);
         let mut network = Self {
             cluster_name,
+            request_identifier,
             is_local: local_deployment,
             server_connections,
             batch_size,
@@ -52,7 +55,8 @@ impl Network {
         for server_id in &server_ids {
             let server_address = get_node_addr(&self.cluster_name, *server_id, self.is_local)
                 .expect("Couldn't resolve server IP");
-            let task = tokio::spawn(Self::get_server_connection(*server_id, server_address));
+            let request_identifier = self.request_identifier.clone();
+            let task = tokio::spawn(Self::get_server_connection(request_identifier, *server_id, server_address));
             connection_tasks.push(task);
         }
         let finished_tasks = futures::future::join_all(connection_tasks).await;
@@ -82,6 +86,7 @@ impl Network {
     }
 
     async fn get_server_connection(
+        request_identifier: RequestIdentifier,
         server_id: NodeId,
         server_address: SocketAddr,
     ) -> (FromServerConnection, ToServerConnection) {
@@ -93,7 +98,7 @@ impl Network {
                     stream.set_nodelay(true).unwrap();
                     let mut registration_connection = frame_registration_connection(stream);
                     registration_connection
-                        .send(RegistrationMessage::ClientRegister)
+                        .send(RegistrationMessage::CliClientRegister(request_identifier))
                         .await
                         .expect("Couldn't send registration to server");
                     let underlying_stream = registration_connection.into_inner().into_inner();

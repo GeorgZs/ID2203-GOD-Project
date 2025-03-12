@@ -13,6 +13,7 @@ pub mod messages {
     pub enum RegistrationMessage {
         NodeRegister(NodeId),
         ClientRegister,
+        CliClientRegister(RequestIdentifier),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
