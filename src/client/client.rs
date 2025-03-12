@@ -6,7 +6,6 @@ use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
-use omnipaxos_kv::common::ds::DataSourceQueryType::INSERT;
 use omnipaxos_kv::common::ds::QueryParams;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

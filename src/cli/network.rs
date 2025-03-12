@@ -120,6 +120,7 @@ impl Network {
     }
 
     // Removes all server connections, but waits for queued writes to the servers to finish first
+    #[allow(dead_code)]
     pub async fn shutdown(&mut self) {
         self.cancel_token.cancel();
         let connection_count = self.server_connections.len();

@@ -1,7 +1,7 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
-use omnipaxos_kv::common::{ds::{Command, DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}, utils::get_node_addr};
-use omnipaxos_kv::common::messages::{RequestIdentifier, ServerMessage};
+use omnipaxos_kv::common::{ds::{Command, DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
+use omnipaxos_kv::common::messages::{ServerMessage};
 use crate::network::Network;
 
 mod network;
@@ -58,7 +58,7 @@ pub async fn main() {
 
     // March statement to a node, match it to a
 
-    let mut network_result = Network::new(
+    let network_result = Network::new(
       String::from("empty"),
       vec![1,2,3],
       LOCAL_DEPLOYMENT,
@@ -73,15 +73,12 @@ pub async fn main() {
         network.send(1, client_message).await;
 
         match network.server_messages.recv().await {
-          Some(ServerMessage::ReadResponse(request_identifier, consistency_level, opt_res)) => {
+          Some(ServerMessage::ReadResponse(_, _, opt_res)) => {
               // Self::wait_until_sync_time(&mut self.config, start_time).await;
               println!("Read response {:?}", opt_res);
           }
           _ => panic!("Error waiting for start signal"),
         }
-      },
-      _ => {
-        print!("D");
       }
     }
 

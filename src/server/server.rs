@@ -304,7 +304,7 @@ impl OmniPaxosServer {
                 let leader_option = self.omnipaxos.get_current_leader();
                 match leader_option {
                     Some((leader_id, _)) => {
-                        if (self.id == leader_id) {
+                        if self.id == leader_id {
                             info!("{}: Node: {}, Received leader command, I am the leader, querying database of server: {}", request_identifier, self.id, self.id);
                             self.handle_local_datasource_command(request_identifier, consistency_level, command).await
                         } else {

@@ -1,13 +1,7 @@
 use crate::{configs::OmniPaxosServerConfig, server::OmniPaxosServer};
 use env_logger;
-use omnipaxos_kv::db::postgres_parser::PGParser;
-use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
 use std::{env, fs};
 use toml;
-use db::postgres_connection::PGConnection;
-use db::repository::Repository;
-use omnipaxos_kv::db;
-use omnipaxos_kv::db::repository::DataSourceConnection;
 
 mod configs;
 mod database;

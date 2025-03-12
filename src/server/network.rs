@@ -264,6 +264,7 @@ impl Network {
     }
 
     // Removes all peer connections, but waits for queued writes to the peers to finish first
+    #[allow(dead_code)]
     pub async fn shutdown(&mut self) {
         self.cancel_token.cancel();
         for peer_connection in self.peer_connections.drain(..) {
@@ -378,6 +379,7 @@ impl PeerConnection {
         self.outgoing_messages.send(msg)
     }
 
+    #[allow(dead_code)]
     async fn wait_for_writes_and_shutdown(self) {
         let _ = tokio::time::timeout(Duration::from_secs(5), self.writer_task).await;
     }

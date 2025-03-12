@@ -27,16 +27,3 @@ impl <T: DataSourceConnection> Repository<T> {
     }
 }
 
-
-fn initializer_connect() {
-    // calls postgres_connection.rs
-}
-
-// enum SqlCommand {
-//     INSERT(HashMap::<String, Any>)
-// }
-
-fn write() {}
-fn read() {}
-
-

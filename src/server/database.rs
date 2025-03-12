@@ -1,5 +1,4 @@
-use omnipaxos_kv::common::ds::{DataSourceCommand, DataSourceQueryType};
-use std::collections::HashMap;
+use omnipaxos_kv::common::ds::{DataSourceCommand};
 use omnipaxos_kv::db::postgres_connection::PGConnection;
 use omnipaxos_kv::db::postgres_parser::PGParser;
 use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
