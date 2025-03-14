@@ -69,6 +69,7 @@ impl CliNetwork {
         let mut connections = cli_conns.lock().await;
         match connections.get_mut(&to) {
             Some(connection) => {
+                info!("Sending response to cli client {}", to);
                 if let Err(err) = connection.send(msg) {
                     warn!("Couldn't send msg to client {to}: {err}");
                     connections.remove(&to);
