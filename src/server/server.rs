@@ -275,6 +275,7 @@ impl OmniPaxosServer {
                                     info!("{}: Node: {}, After receiving {} responses for number of nodes: {}, we can respond with the linearizable answer",
                                         request_identifier, self.id, number_of_responses, self.peers.len() + 1);
                                     let linearizable_response = self.get_linearizable_response(request_identifier.clone());
+                                    self.read_requests.remove(&request_identifier);
                                     self.cli_network.send_to_cli_client(request_identifier.clone(),
                                         ServerMessage::ReadResponse(request_identifier, consistency_level, linearizable_response),
                                     ).await;
