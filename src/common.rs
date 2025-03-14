@@ -1,27 +1,39 @@
 pub mod messages {
     use omnipaxos::{messages::Message as OmniPaxosMessage, util::NodeId};
     use serde::{Deserialize, Serialize};
-
     use super::{
         ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
     };
 
+    pub type RequestIdentifier = String;
+
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum RegistrationMessage {
         NodeRegister(NodeId),
         ClientRegister,
+        CliClientRegister(RequestIdentifier),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClusterMessage {
         OmniPaxosMessage(OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
+        ReadRequest(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
+        ReadResponse(RequestIdentifier, ConsistencyLevel, usize, Option<String>)
+    }
+
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub enum ConsistencyLevel {
+        Local,
+        Leader,
+        Linearizable
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
         Append(CommandId, DataSourceCommand),
+        Read(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,6 +41,7 @@ pub mod messages {
         Write(CommandId),
         Read(CommandId, Option<String>),
         StartSignal(Timestamp),
+        ReadResponse(RequestIdentifier, ConsistencyLevel, Option<String>)
     }
 
     impl ServerMessage {
@@ -37,6 +50,7 @@ pub mod messages {
                 ServerMessage::Write(id) => *id,
                 ServerMessage::Read(id, _) => *id,
                 ServerMessage::StartSignal(_) => unimplemented!(),
+                ServerMessage::ReadResponse(_, _, _) => unimplemented!()
             }
         }
     }
@@ -155,8 +169,7 @@ pub mod utils {
         node: NodeId,
         is_local: bool,
     ) -> Result<SocketAddr, std::io::Error> {
-        let dns_name = if is_local {
-            // format!("s{node}:800{node}")
+        let dns_name: String = if is_local {
             format!("s{node}:800{node}")
         } else {
             format!("{cluster_name}-server-{node}.internal.zone.:800{node}")

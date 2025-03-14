@@ -52,7 +52,19 @@ services:
       - "8003:8003"
     depends_on:
       - db3
-
+  
+  cli:
+    image: cli-client
+    container_name: cli
+    networks:
+      - servers-network
+    ports:
+      - "8080:8080"
+    depends_on:
+      - s1
+      - s2
+      - s3
+    
   c1:
     image: omnipaxos-client
     build:

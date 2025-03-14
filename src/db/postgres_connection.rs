@@ -1,9 +1,11 @@
-use sqlx::postgres::PgPoolOptions;
+use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
 use dotenv::dotenv;
+use serde_json::Value;
 use crate::db::repository::DataSourceConnection;
+use tokio_postgres::{NoTls, Row};
 
 pub struct PGConnection {
-    pool: sqlx::PgPool
+    pool: Pool,
 }
 
 impl DataSourceConnection for PGConnection {
@@ -16,35 +18,51 @@ impl DataSourceConnection for PGConnection {
         // let host = "localhost";
         // let port = "5431"; 
 
-        let database_url = format!("postgres://{user}:{password}@{host}:{port}/{db}"); //for docker, if not docker use localhost
+        //let database_url = format!("postgres://{user}:{password}@{host}:{port}/{db}"); //for docker, if not docker use localhost
 
-        let pool = PgPoolOptions::new()
-            .max_connections(5)
-            .connect(&database_url).await.unwrap();
+        let mut config = tokio_postgres::Config::new();
+        config.dbname(db);
+        config.user(user);
+        config.password(password);
+        config.port(port.parse().unwrap());
+        config.host(host);
+
+        let mgr_config = ManagerConfig {
+            recycling_method: RecyclingMethod::Fast,
+        };
+
+        // Create the connection pool
+        let mgr = Manager::from_config(config, NoTls, mgr_config);
+        let pool = Pool::builder(mgr).max_size(16).build().unwrap();
 
         println!("DB connection created!");
         PGConnection{pool}
     }
 
-    async fn read(&self, query_string: &str) {
-        // todo!();
-        println!("Reading from database!");
-        let output = sqlx::query(query_string).fetch_all(&self.pool).await;
+    async fn read(&self, query_string: &str) -> Option<Option<String>> {
+        let client = self.pool.get().await.unwrap();
+        let stmt = client.prepare(query_string).await.unwrap();
+        let output = client.query(&stmt, &[]).await;
 
         match output {
             Ok(rows) => {
-                for row in rows {
-                    println!("{:?}", row);
+                match pg_rows_to_json(rows).await {
+                    Ok(json) => {Some(Some(json))},
+                    Err(_) => {Some(None)}
                 }
             },
-            Err(e) => println!("Error executing query: {:?}", e),
+            Err(e) => {
+                println!("Error executing query: {:?}", e);
+                Some(None)
+            }
         }
     }
-
     async fn write(&self, query_string: &str) {
         // todo!();
         println!("Writing to database!");
-        let output = sqlx::query(query_string).execute(&self.pool).await;
+        let client = self.pool.get().await.unwrap();
+        let stmt = client.prepare(query_string).await.unwrap();
+        let output = client.query(&stmt, &[]).await;
 
         match output {
             Ok(_) => println!("Write successful!"),
@@ -52,6 +70,41 @@ impl DataSourceConnection for PGConnection {
         }
     }
 }
+
+
+async fn pg_rows_to_json(rows: Vec<Row>) -> Result<String, Box<dyn std::error::Error>> {
+    let mut json_rows = Vec::new();
+
+    for row in rows {
+        let mut json_obj = serde_json::Map::new();
+
+        // For each column, extract data and convert to JSON
+        let column_count = row.columns().len();
+        for i in 0..column_count {
+            let column_name = row.columns()[i].name();
+            let column_type = row.columns()[i].type_();
+
+            let json_value = match *column_type {
+                postgres_types::Type::TEXT | postgres_types::Type::VARCHAR => row.get::<_, String>(i).into(),
+                postgres_types::Type::INT2 => row.get::<_, i16>(i).into(),
+                postgres_types::Type::INT4 => row.get::<_, i32>(i).into(),
+                postgres_types::Type::INT8 => row.get::<_, i64>(i).into(),
+                postgres_types::Type::FLOAT4 | postgres_types::Type::FLOAT8 => row.get::<_, f64>(i).into(),
+                postgres_types::Type::BOOL => row.get::<_, bool>(i).into(),
+                _ => Value::Null,
+            };
+
+            json_obj.insert(column_name.to_string(), json_value);
+        }
+
+        json_rows.push(Value::Object(json_obj));
+    }
+
+    let json_string = serde_json::to_string(&json_rows)?;
+
+    Ok(json_string)
+}
+
 
 // pub async fn get_user(pool: &sqlx::PgPool, user_id: i32) -> Result<User, sqlx::Error> {
 //     let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE id = $1")

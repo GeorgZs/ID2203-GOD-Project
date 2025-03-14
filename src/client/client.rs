@@ -6,7 +6,6 @@ use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tokio::time::interval;
-use omnipaxos_kv::common::ds::DataSourceQueryType::INSERT;
 use omnipaxos_kv::common::ds::QueryParams;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -169,7 +168,9 @@ impl Client {
             false => request = ClientMessage::Append(self.next_request_id, read_ds_command),
         };
 
-        debug!("Sending {request:?}");
+        let address = self.active_server;
+
+        debug!("HOLA Sending {request:?} to this address {address:?}");
         self.network.send(self.active_server, request).await;
         self.client_data.new_request(is_write);
         self.next_request_id += 1;

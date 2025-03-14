@@ -6,8 +6,9 @@ use omnipaxos_kv::common::{
     utils::*,
 };
 use std::collections::HashMap;
+use std::fmt::{Debug, Display};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::time::Duration;
 use tokio::{
     io::AsyncWriteExt,
@@ -18,7 +19,99 @@ use tokio::{
     sync::mpsc::Receiver,
 };
 use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
+
+pub struct CliNetwork {
+    id: NodeId,
+    batch_size: usize,
+    cancel_token: CancellationToken,
+    cli_client_connections: Arc<Mutex<HashMap<RequestIdentifier, ClientConnection<RequestIdentifier>>>>,
+    cli_client_message_sender: Sender<(RequestIdentifier, ClientMessage)>,
+    pub cli_client_messages: Arc<Mutex<Receiver<(RequestIdentifier, ClientMessage)>>>,
+}
+
+impl CliNetwork {
+    pub fn new(id: NodeId, batch_size: usize) -> Self {
+        let (cli_client_message_sender, cli_client_messages) = tokio::sync::mpsc::channel(batch_size);
+        CliNetwork {
+            id,
+            batch_size,
+            cancel_token: CancellationToken::new(),
+            cli_client_connections: Arc::new(Mutex::new(HashMap::new())),
+            cli_client_message_sender,
+            cli_client_messages: Arc::new(Mutex::new(cli_client_messages)),
+        }
+    }
+
+    pub async fn listen_to_connections(&self) {
+        let (connection_sink, mut connection_source) = mpsc::channel(30);
+        let _ = self.spawn_connection_listener(connection_sink.clone());
+        while let Some(new_connection) = connection_source.recv().await {
+            match new_connection {
+                NewConnection::ToPeer(_) => {
+                    // ignore
+                }
+                NewConnection::ToClient(_) => {
+                    // ignore
+                }
+                NewConnection::ToCliClient(connection) => {
+                    let cli_conns = Arc::clone(&self.cli_client_connections);
+                    let mut connections = cli_conns.lock().await;
+                    connections.insert(connection.client_id.clone(), connection);
+                }
+            }
+        }
+    }
+    #[allow(dead_code)]
+    pub async fn send_to_cli_client(&self, to: RequestIdentifier, msg: ServerMessage) {
+        let cli_conns = Arc::clone(&self.cli_client_connections);
+        let mut connections = cli_conns.lock().await;
+        match connections.get_mut(&to) {
+            Some(connection) => {
+                info!("Sending response to cli client {}", to);
+                if let Err(err) = connection.send(msg) {
+                    warn!("Couldn't send msg to client {to}: {err}");
+                    connections.remove(&to);
+                }
+            }
+            None => warn!("Not connected to client {to}"),
+        }
+    }
+
+    fn spawn_connection_listener(
+        &self,
+        connection_sender: Sender<NewConnection>,
+    ) -> tokio::task::JoinHandle<()> {
+        let port = 8000 + self.id as u16;
+        let listening_address = SocketAddr::from(([0, 0, 0, 0], port));
+        let cli_client_sender = self.cli_client_message_sender.clone();
+        let batch_size = self.batch_size;
+        let cancel_token = self.cancel_token.clone();
+        tokio::spawn(async move {
+            let listener = TcpListener::bind(listening_address).await.unwrap();
+            loop {
+                match listener.accept().await {
+                    Ok((tcp_stream, socket_addr)) => {
+                        info!("New connection from {socket_addr}");
+                        tcp_stream.set_nodelay(true).unwrap();
+                        tokio::spawn(Network::handle_incoming_connection(
+                            tcp_stream,
+                            Some(cli_client_sender.clone()),
+                            None,
+                            None,
+                            connection_sender.clone(),
+                            None,
+                            batch_size,
+                            cancel_token.clone(),
+                        ));
+                    }
+                    Err(e) => error!("Error listening for new connection: {:?}", e),
+                }
+            }
+        })
+    }
+}
 
 pub struct Network {
     cluster_name: String,
@@ -26,7 +119,7 @@ pub struct Network {
     peers: Vec<NodeId>,
     is_local: bool,
     peer_connections: Vec<Option<PeerConnection>>,
-    client_connections: HashMap<ClientId, ClientConnection>,
+    client_connections: HashMap<ClientId, ClientConnection<ClientId>>,
     max_client_id: Arc<Mutex<ClientId>>,
     batch_size: usize,
     client_message_sender: Sender<(ClientId, ClientMessage)>,
@@ -86,6 +179,9 @@ impl Network {
                         .client_connections
                         .insert(connection.client_id, connection);
                 }
+                NewConnection::ToCliClient(_) => {
+                    // ignore
+                }
             }
             let all_clients_connected = self.client_connections.len() >= num_clients;
             let all_cluster_connected = self.peer_connections.iter().all(|c| c.is_some());
@@ -116,10 +212,11 @@ impl Network {
                         tcp_stream.set_nodelay(true).unwrap();
                         tokio::spawn(Self::handle_incoming_connection(
                             tcp_stream,
-                            client_sender.clone(),
-                            cluster_sender.clone(),
+                            None,
+                            Some(client_sender.clone()),
+                            Some(cluster_sender.clone()),
                             connection_sender.clone(),
-                            max_client_id_handle.clone(),
+                            Some(max_client_id_handle.clone()),
                             batch_size,
                             cancel_token.clone(),
                         ));
@@ -132,10 +229,11 @@ impl Network {
 
     async fn handle_incoming_connection(
         connection: TcpStream,
-        client_message_sender: Sender<(ClientId, ClientMessage)>,
-        cluster_message_sender: Sender<(NodeId, ClusterMessage)>,
+        cli_client_message_sender: Option<Sender<(RequestIdentifier, ClientMessage)>>,
+        client_message_sender: Option<Sender<(ClientId, ClientMessage)>>,
+        cluster_message_sender: Option<Sender<(NodeId, ClusterMessage)>>,
         connection_sender: Sender<NewConnection>,
-        max_client_id_handle: Arc<Mutex<ClientId>>,
+        max_client_id_handle_opt: Option<Arc<Mutex<ClientId>>>,
         batch_size: usize,
         cancel_token: CancellationToken,
     ) {
@@ -146,28 +244,58 @@ impl Network {
             Some(Ok(RegistrationMessage::NodeRegister(node_id))) => {
                 info!("Identified connection from node {node_id}");
                 let underlying_stream = registration_connection.into_inner().into_inner();
-                NewConnection::ToPeer(PeerConnection::new(
-                    node_id,
-                    underlying_stream,
-                    batch_size,
-                    cluster_message_sender,
-                    cancel_token,
-                ))
+                match cluster_message_sender {
+                    Some(sender) => {
+                        Some(NewConnection::ToPeer(PeerConnection::new(
+                            node_id,
+                            underlying_stream,
+                            batch_size,
+                            sender,
+                            cancel_token,
+                        )))
+                    }
+                    None => None
+                }
             }
             Some(Ok(RegistrationMessage::ClientRegister)) => {
-                let next_client_id = {
-                    let mut max_client_id = max_client_id_handle.lock().unwrap();
-                    *max_client_id += 1;
-                    *max_client_id
-                };
-                info!("Identified connection from client {next_client_id}");
+                match max_client_id_handle_opt {
+                    Some(max_client_id_handle) => {
+                        let next_client_id = {
+                            let mut max_client_id = max_client_id_handle.lock().await;
+                            *max_client_id += 1;
+                            *max_client_id
+                        };
+                        info!("Identified connection from client {next_client_id}");
+                        let underlying_stream = registration_connection.into_inner().into_inner();
+                        match client_message_sender {
+                            Some(sender) => {
+                                Some(NewConnection::ToClient(ClientConnection::new(
+                                    next_client_id,
+                                    underlying_stream,
+                                    batch_size,
+                                    sender,
+                                )))
+                            }
+                            None => None
+                        }
+                    }
+                    None => { None }
+                }
+            }
+            Some(Ok(RegistrationMessage::CliClientRegister(request_identifier))) => {
+                info!("Identified connection from cli client {:?}", request_identifier);
                 let underlying_stream = registration_connection.into_inner().into_inner();
-                NewConnection::ToClient(ClientConnection::new(
-                    next_client_id,
-                    underlying_stream,
-                    batch_size,
-                    client_message_sender,
-                ))
+                match cli_client_message_sender {
+                    Some(sender) => {
+                        Some(NewConnection::ToCliClient(ClientConnection::new(
+                            request_identifier,
+                            underlying_stream,
+                            batch_size,
+                            sender,
+                        )))
+                    }
+                    None => None
+                }
             }
             Some(Err(err)) => {
                 error!("Error deserializing handshake: {:?}", err);
@@ -178,7 +306,12 @@ impl Network {
                 return;
             }
         };
-        connection_sender.send(new_connection).await.unwrap();
+        match new_connection {
+            Some(connection) => {
+                connection_sender.send(connection).await.unwrap();
+            }
+            None => {}
+        }
     }
 
     fn spawn_peer_connectors(&self, connection_sender: Sender<NewConnection>) {
@@ -264,6 +397,7 @@ impl Network {
     }
 
     // Removes all peer connections, but waits for queued writes to the peers to finish first
+    #[allow(dead_code)]
     pub async fn shutdown(&mut self) {
         self.cancel_token.cancel();
         for peer_connection in self.peer_connections.drain(..) {
@@ -284,7 +418,8 @@ impl Network {
 
 enum NewConnection {
     ToPeer(PeerConnection),
-    ToClient(ClientConnection),
+    ToClient(ClientConnection<ClientId>),
+    ToCliClient(ClientConnection<RequestIdentifier>)
 }
 
 struct PeerConnection {
@@ -378,31 +513,34 @@ impl PeerConnection {
         self.outgoing_messages.send(msg)
     }
 
+    #[allow(dead_code)]
     async fn wait_for_writes_and_shutdown(self) {
         let _ = tokio::time::timeout(Duration::from_secs(5), self.writer_task).await;
     }
 }
 
-struct ClientConnection {
-    client_id: ClientId,
+struct ClientConnection<T> where T: Send + Display + Clone + Debug + 'static {
+    client_id: T,
     outgoing_messages: UnboundedSender<ServerMessage>,
 }
 
-impl ClientConnection {
+impl <T> ClientConnection<T> where T: Send + Display + Clone + Debug + 'static {
     pub fn new(
-        client_id: ClientId,
+        client_id: T,
         connection: TcpStream,
         batch_size: usize,
-        incoming_messages: Sender<(ClientId, ClientMessage)>,
+        incoming_messages: Sender<(T, ClientMessage)>,
     ) -> Self {
         let (reader, mut writer) = frame_servers_connection(connection);
+        let client_id_clone = client_id.clone();
         // Reader Actor
         let _reader_task = tokio::spawn(async move {
             let mut buf_reader = reader.ready_chunks(batch_size);
             while let Some(messages) = buf_reader.next().await {
                 for msg in messages {
+                    let client_id_clone_l = client_id.clone();
                     match msg {
-                        Ok(m) => incoming_messages.send((client_id, m)).await.unwrap(),
+                        Ok(m) => incoming_messages.send((client_id_clone_l, m)).await.unwrap(),
                         Err(err) => error!("Error deserializing message: {:?}", err),
                     }
                 }
@@ -415,20 +553,18 @@ impl ClientConnection {
             while message_rx.recv_many(&mut buffer, batch_size).await != 0 {
                 for msg in buffer.drain(..) {
                     if let Err(err) = writer.feed(msg).await {
-                        error!("Couldn't send message to client {client_id}: {err}");
-                        error!("Killing connection to client {client_id}");
+                        error!("Couldn't send message to client: {err}");
                         return;
                     }
                 }
                 if let Err(err) = writer.flush().await {
-                    error!("Couldn't send message to client {client_id}: {err}");
-                    error!("Killing connection to client {client_id}");
+                    error!("Couldn't send message to client: {err}");
                     return;
                 }
             }
         });
         ClientConnection {
-            client_id,
+            client_id: client_id_clone,
             outgoing_messages: message_tx,
         }
     }
