@@ -54,14 +54,14 @@ pub async fn main() {
     let network_result = Network::new(
         unique_identifier as RequestIdentifier,
         String::from("empty"),
-        vec![1,2,3],
+        vec![args.node],
         LOCAL_DEPLOYMENT,
         NETWORK_BATCH_SIZE
     ).await;
 
     match network_result {
       mut network => {
-        network.send(1, client_message).await;
+        network.send(args.node, client_message).await;
 
         match network.server_messages.recv().await {
           Some(ServerMessage::ReadResponse(_, _, opt_res)) => {
