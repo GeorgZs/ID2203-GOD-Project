@@ -216,8 +216,8 @@ impl OmniPaxosServer {
                 ClientMessage::Append(command_id, kv_command) => {
                     self.append_to_log(from, command_id, kv_command)
                 }
-                ClientMessage::Read(request_identifier, consistency_level, command) => {
-                    self.handle_datasource_command(request_identifier, consistency_level, command).await
+                ClientMessage::Read(request_identifier, consistency_level, ds_command) => {
+                    self.handle_datasource_command(request_identifier, consistency_level, ds_command).await
                 }
             }
         }
@@ -251,17 +251,17 @@ impl OmniPaxosServer {
                 }
                 ClusterMessage::ReadRequest(request_identifier, consistency_level, command) => {
                     info!("{}: Node: {}, as requested, I am querying database of server: {}", request_identifier, self.id, self.id);
-                    let res = self.database.handle_command(command.ds_cmd).await;
+                    let res = self.database.handle_command(command).await;
                     match res {
                         Some(opt) => {
-                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, self.current_decided_idx, opt))
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, self.current_decided_idx, opt))
                         }
                         None => {
-                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, command.client_id, self.current_decided_idx, None))
+                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, self.current_decided_idx, None))
                         }
                     }
                 }
-                ClusterMessage::ReadResponse(request_identifier, consistency_level, _, current_decided_idx, response_option) => {
+                ClusterMessage::ReadResponse(request_identifier, consistency_level, current_decided_idx, response_option) => {
                     match consistency_level {
                         ConsistencyLevel::Leader => {
                             self.cli_network.send_to_cli_client(request_identifier.clone(), ServerMessage::ReadResponse(request_identifier, consistency_level, response_option)).await;
@@ -327,7 +327,7 @@ impl OmniPaxosServer {
         Ok(())
     }
 
-    async fn handle_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
+    async fn handle_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: DataSourceCommand) {
         match consistency_level {
             ConsistencyLevel::Local => {
                 info!("{}: Node: {}, Received local command, querying database of server: {}", request_identifier, self.id, self.id);
@@ -353,7 +353,7 @@ impl OmniPaxosServer {
             }
             ConsistencyLevel::Linearizable => {
                 info!("{}: Node: {}, Received linearizable command, sending read request to all peers", request_identifier, self.id);
-                let res = self.get_local_result(command.clone().ds_cmd).await;
+                let res = self.get_local_result(command.clone()).await;
                 self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { current_idx: self.current_decided_idx, value: res }]);
                 for peer in &self.peers {
                     self.network.send_to_cluster(*peer, ClusterMessage::ReadRequest(request_identifier.clone(), consistency_level.clone(), command.clone()))
@@ -369,8 +369,8 @@ impl OmniPaxosServer {
             None => { None }
         }
     }
-    async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: Command) {
-        let res = self.get_local_result(command.ds_cmd).await;
+    async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: DataSourceCommand) {
+        let res = self.get_local_result(command).await;
         self.cli_network.send_to_cli_client(request_identifier.clone(), ServerMessage::ReadResponse(request_identifier, consistency_level, res)).await;
     }
 

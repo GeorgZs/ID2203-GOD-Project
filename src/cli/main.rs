@@ -1,6 +1,6 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
-use omnipaxos_kv::common::{ds::{Command, DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
+use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
 use omnipaxos_kv::common::messages::{RequestIdentifier, ServerMessage};
 use crate::network::Network;
 
@@ -40,13 +40,6 @@ pub async fn main() {
         }),
     };
 
-    let command = Command {
-      client_id: 1,
-      coordinator_id: 1,
-      id: 1,
-      ds_cmd: ds_command
-    };
-
     let consistency_level: ConsistencyLevel = match args.consistency.as_str() {
         "local" => ConsistencyLevel::Local,
         "leader" => ConsistencyLevel::Leader,
@@ -54,7 +47,7 @@ pub async fn main() {
         _ => ConsistencyLevel::Local,
     };
 
-    let client_message = ClientMessage::Read(unique_identifier.clone(), consistency_level, command);
+    let client_message = ClientMessage::Read(unique_identifier.clone(), consistency_level, ds_command);
 
     // March statement to a node, match it to a
 
