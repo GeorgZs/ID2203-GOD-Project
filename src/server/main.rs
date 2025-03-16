@@ -7,6 +7,8 @@ mod configs;
 mod database;
 mod network;
 mod server;
+mod omnipaxos_rsm;
+mod transactions_rsm;
 
 #[tokio::main]
 pub async fn main() {

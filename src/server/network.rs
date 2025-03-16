@@ -118,14 +118,14 @@ pub struct Network {
     id: NodeId,
     peers: Vec<NodeId>,
     is_local: bool,
-    peer_connections: Vec<Option<PeerConnection>>,
-    client_connections: HashMap<ClientId, ClientConnection<ClientId>>,
+    peer_connections: Arc<Mutex<Vec<Option<PeerConnection>>>>,
+    client_connections: Arc<Mutex<HashMap<ClientId, ClientConnection<ClientId>>>>,
     max_client_id: Arc<Mutex<ClientId>>,
     batch_size: usize,
     client_message_sender: Sender<(ClientId, ClientMessage)>,
     cluster_message_sender: Sender<(NodeId, ClusterMessage)>,
-    pub cluster_messages: Receiver<(NodeId, ClusterMessage)>,
-    pub client_messages: Receiver<(ClientId, ClientMessage)>,
+    pub cluster_messages: Arc<Mutex<Receiver<(NodeId, ClusterMessage)>>>,
+    pub client_messages: Arc<Mutex<Receiver<(ClientId, ClientMessage)>>>,
     cancel_token: CancellationToken,
 }
 
@@ -150,14 +150,14 @@ impl Network {
             is_local: local_deployment,
             id,
             peers,
-            peer_connections: cluster_connections,
-            client_connections: HashMap::new(),
+            peer_connections: Arc::new(Mutex::new(cluster_connections)),
+            client_connections: Arc::new(Mutex::new(HashMap::new())),
             max_client_id: Arc::new(Mutex::new(0)),
             batch_size,
             client_message_sender,
             cluster_message_sender,
-            cluster_messages,
-            client_messages,
+            cluster_messages: Arc::new(Mutex::new(cluster_messages)),
+            client_messages: Arc::new(Mutex::new(client_messages)),
             cancel_token: CancellationToken::new(),
         };
         network.initialize_connections(num_clients).await;
@@ -172,19 +172,26 @@ impl Network {
             match new_connection {
                 NewConnection::ToPeer(connection) => {
                     let peer_idx = self.cluster_id_to_idx(connection.peer_id).unwrap();
-                    self.peer_connections[peer_idx] = Some(connection);
+                    let peer_conns_clone = Arc::clone(&self.peer_connections);
+                    let mut peer_connections = peer_conns_clone.lock().await;
+                    peer_connections[peer_idx] = Some(connection);
                 }
                 NewConnection::ToClient(connection) => {
-                    let _ = self
-                        .client_connections
+                    let conns = Arc::clone(&self.client_connections);
+                    let mut connections = conns.lock().await;
+                    let _ = connections
                         .insert(connection.client_id, connection);
                 }
                 NewConnection::ToCliClient(_) => {
                     // ignore
                 }
             }
-            let all_clients_connected = self.client_connections.len() >= num_clients;
-            let all_cluster_connected = self.peer_connections.iter().all(|c| c.is_some());
+            let conns = Arc::clone(&self.client_connections);
+            let connections = conns.lock().await;
+            let all_clients_connected = connections.len() >= num_clients;
+            let peer_conns_clone = Arc::clone(&self.peer_connections);
+            let peer_connections = peer_conns_clone.lock().await;
+            let all_cluster_connected = peer_connections.iter().all(|c| c.is_some());
             if all_clients_connected && all_cluster_connected {
                 listener_handle.abort();
                 break;
@@ -369,13 +376,15 @@ impl Network {
         }
     }
 
-    pub fn send_to_cluster(&mut self, to: NodeId, msg: ClusterMessage) {
+    pub async fn send_to_cluster(&self, to: NodeId, msg: ClusterMessage) {
+        let peer_conns_clone = Arc::clone(&self.peer_connections);
+        let mut peer_connections = peer_conns_clone.lock().await;
         match self.cluster_id_to_idx(to) {
-            Some(idx) => match &mut self.peer_connections[idx] {
+            Some(idx) => match peer_connections[idx] {
                 Some(ref mut connection) => {
                     if let Err(err) = connection.send(msg) {
                         warn!("Couldn't send msg to peer {to}: {err}");
-                        self.peer_connections[idx] = None;
+                        peer_connections[idx] = None;
                     }
                 }
                 None => warn!("Not connected to node {to}"),
@@ -384,12 +393,14 @@ impl Network {
         }
     }
 
-    pub fn send_to_client(&mut self, to: ClientId, msg: ServerMessage) {
-        match self.client_connections.get_mut(&to) {
+    pub async fn send_to_client(&self, to: ClientId, msg: ServerMessage) {
+        let conns = Arc::clone(&self.client_connections);
+        let mut connections = conns.lock().await;
+        match connections.get_mut(&to) {
             Some(connection) => {
                 if let Err(err) = connection.send(msg) {
                     warn!("Couldn't send msg to client {to}: {err}");
-                    self.client_connections.remove(&to);
+                    connections.remove(&to);
                 }
             }
             None => warn!("Not connected to client {to}"),
@@ -400,13 +411,15 @@ impl Network {
     #[allow(dead_code)]
     pub async fn shutdown(&mut self) {
         self.cancel_token.cancel();
-        for peer_connection in self.peer_connections.drain(..) {
+        let peer_conns_clone = Arc::clone(&self.peer_connections);
+        let mut peer_connections = peer_conns_clone.lock().await;
+        for peer_connection in peer_connections.drain(..) {
             if let Some(connection) = peer_connection {
                 connection.wait_for_writes_and_shutdown().await;
             }
         }
         for _ in 0..self.peers.len() {
-            self.peer_connections.push(None);
+            peer_connections.push(None);
         }
     }
 

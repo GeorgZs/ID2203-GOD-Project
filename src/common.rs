@@ -8,6 +8,11 @@ pub mod messages {
 
     pub type RequestIdentifier = String;
 
+    #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub enum RSMIdentifier {
+        TRANSACTION
+    }
+
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum RegistrationMessage {
         NodeRegister(NodeId),
@@ -17,7 +22,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClusterMessage {
-        OmniPaxosMessage(OmniPaxosMessage<Command>),
+        OmniPaxosMessage(RSMIdentifier, OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
         ReadRequest(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
         ReadResponse(RequestIdentifier, ConsistencyLevel, usize, Option<String>)
