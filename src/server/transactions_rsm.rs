@@ -6,18 +6,19 @@ use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
 use omnipaxos_kv::common::messages::{ServerMessage, TableName};
 use crate::database::Database;
 use crate::network::Network;
-use crate::omnipaxos_rsm::RSMConsumer;
+use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
 
 pub struct TransactionsRSMConsumer {
     id: NodeId,
     network: Arc<Network>,
     database: Arc<Mutex<Database>>,
-    shard_leader_config: HashMap<TableName, NodeId>
+    shard_leader_config: HashMap<TableName, NodeId>,
+    pub shard_leader_rsm: Option<Arc<Mutex<OmniPaxosRSM>>>
 }
 
 impl RSMConsumer for TransactionsRSMConsumer {
     fn new(id: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> TransactionsRSMConsumer {
-        TransactionsRSMConsumer { id, network, database, shard_leader_config }
+        TransactionsRSMConsumer { id, network, database, shard_leader_config, shard_leader_rsm: None }
     }
 
     fn get_network(&self) -> Arc<Network> {
@@ -27,20 +28,22 @@ impl RSMConsumer for TransactionsRSMConsumer {
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {
         Box::pin(async move {
             for command in commands {
-                let lock = Arc::clone(&self.database);
-                let mut db = lock.lock().await;
-                let mut result_found: bool = false;
-                let mut buffer = String::new();
+                let command_id = command.id.clone();
+                let client_id = command.client_id.clone();
+                let coordination_id = command.coordinator_id.clone();
                 match command.cmd_type {
                     CommandType::DatasourceCommand => {
                         if let Some(ref ds_cmd) = command.ds_cmd {
                             if let Some(ref ds_obj) = ds_cmd.data_source_object {
                                 if let Some(leader_id) = self.shard_leader_config.get(&ds_obj.table_name) {
                                     if self.id == *leader_id {
-                                        let read = db.handle_command(ds_cmd.clone()).await; // Clone to avoid move
-                                        if let Some(Some(rd)) = read {
-                                            buffer.push_str(rd.as_str());
-                                            result_found = true;
+                                        match self.shard_leader_rsm {
+                                            Some(ref leader_rsm) => {
+                                                let rsm_clone = Arc::clone(leader_rsm);
+                                                let mut rsm = rsm_clone.lock().await;
+                                                rsm.append_to_log(command)
+                                            }
+                                            None => {}
                                         }
                                     }
                                 }
@@ -52,10 +55,21 @@ impl RSMConsumer for TransactionsRSMConsumer {
                             if let Some(ref ds_obj) = ds_cmd.data_source_object {
                                 if let Some(leader_id) = self.shard_leader_config.get(&ds_obj.table_name) {
                                     if self.id == *leader_id {
-                                        let read = db.handle_command(ds_cmd).await;
-                                        if let Some(Some(rd)) = read {
-                                            buffer.push_str(rd.as_str());
-                                            result_found = true;
+                                        match self.shard_leader_rsm {
+                                            Some(ref leader_rsm) => {
+                                                let rsm_clone = Arc::clone(leader_rsm);
+                                                let mut rsm = rsm_clone.lock().await;
+                                                let replication_command = Command {
+                                                    client_id,
+                                                    coordinator_id: command.coordinator_id,
+                                                    id: command_id,
+                                                    cmd_type: CommandType::DatasourceCommand,
+                                                    ds_cmd: Some(ds_cmd),
+                                                    tx_cmd: None
+                                                };
+                                                rsm.append_to_log(replication_command);
+                                            }
+                                            None => {}
                                         }
                                     }
                                 }
@@ -63,12 +77,8 @@ impl RSMConsumer for TransactionsRSMConsumer {
                         }
                     }
                 }
-                if command.coordinator_id == self.id {
-                    let response = match result_found {
-                        true => ServerMessage::Read(command.id, Some(buffer.clone())),
-                        false => ServerMessage::Write(command.id),
-                    };
-                    self.network.send_to_client(command.client_id, response).await;
+                if coordination_id == self.id {
+                    self.network.send_to_client(client_id, ServerMessage::Write(command_id)).await;
                 }
             }
         })

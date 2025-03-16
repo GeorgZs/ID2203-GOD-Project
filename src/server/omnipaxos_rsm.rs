@@ -15,13 +15,13 @@ use crate::configs::OmniPaxosServerConfig;
 use crate::database::Database;
 use crate::network::Network;
 
-pub trait RSMConsumer {
+pub trait RSMConsumer: Send + Sync {
     fn new(id: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> Self
     where
         Self: Sized;
 
     fn get_network(&self) -> Arc<Network>;
-    fn handle_decided_entries(&mut self, entries: Vec<Command>) -> BoxFuture<()>;
+    fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()>;
 }
 
 pub struct OmniPaxosRSM {
@@ -34,7 +34,7 @@ pub struct OmniPaxosRSM {
 }
 
 impl OmniPaxosRSM {
-    pub fn new(rsm_identifier: RSMIdentifier, config: OmniPaxosServerConfig, consumer: Box<dyn RSMConsumer>) -> Box<OmniPaxosRSM> {
+    pub fn new(rsm_identifier: RSMIdentifier, config: OmniPaxosServerConfig, consumer: Box<dyn RSMConsumer>) -> Arc<Mutex<OmniPaxosRSM>> {
         let mut storage: MemoryStorage<Command> = MemoryStorage::default();
         let server_id = config.server_id.clone();
         let init_leader_ballot = Ballot {
@@ -49,14 +49,14 @@ impl OmniPaxosRSM {
         let omnipaxos_config: OmniPaxosConfig = config.into();
         let omnipaxos_msg_buffer = Vec::with_capacity(omnipaxos_config.server_config.buffer_size);
         let omnipaxos = omnipaxos_config.build(storage).unwrap();
-        Box::new(OmniPaxosRSM {
+        Arc::new(Mutex::new(OmniPaxosRSM {
             rsm_identifier,
             id: server_id,
             omnipaxos,
             current_decided_idx: 0,
             omnipaxos_msg_buffer,
             consumer
-        })
+        }))
     }
 
     pub fn get_current_leader(&self) -> Option<(NodeId, bool)> {
@@ -110,7 +110,7 @@ impl OmniPaxosRSM {
                 .read_decided_suffix(self.current_decided_idx)
                 .unwrap();
             self.current_decided_idx = new_decided_idx;
-            debug!("Decided {new_decided_idx}");
+            debug!("{:?}: Decided {new_decided_idx}", self.rsm_identifier);
             let decided_commands = decided_entries
                 .into_iter()
                 .filter_map(|e| match e {
