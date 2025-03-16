@@ -66,7 +66,7 @@ impl OmniPaxosServer {
         };
 
         let transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config);
-        server.omni_paxos_instances.insert(RSMIdentifier::TRANSACTION, OmniPaxosRSM::new(RSMIdentifier::TRANSACTION, server.config.clone(), Box::new(transactions_rsm_consumer)));
+        server.omni_paxos_instances.insert(RSMIdentifier::Transaction, OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Box::new(transactions_rsm_consumer)));
         // Save config to output file
         server.save_output().expect("Failed to write to file");
         server
@@ -227,11 +227,11 @@ impl OmniPaxosServer {
                     let res = db.handle_command(command).await;
                     match res {
                         Some(opt) => {
-                            let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::TRANSACTION).unwrap();
+                            let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                             self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, transaction_rsm.current_decided_idx, opt)).await;
                         }
                         None => {
-                            let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::TRANSACTION).unwrap();
+                            let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                             self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, transaction_rsm.current_decided_idx, None)).await;
                         }
                     }
@@ -278,7 +278,7 @@ impl OmniPaxosServer {
             ds_cmd: None,
             tx_cmd: Some(tx_cmd)
         };
-        self.omni_paxos_instances.get_mut(&RSMIdentifier::TRANSACTION).unwrap()
+        self.omni_paxos_instances.get_mut(&RSMIdentifier::Transaction).unwrap()
             .append_to_log(command);
     }
 
@@ -312,7 +312,7 @@ impl OmniPaxosServer {
                 self.handle_local_datasource_command(request_identifier, consistency_level, command).await
             }
             ConsistencyLevel::Leader => {
-                let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::TRANSACTION).unwrap();
+                let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                 let leader_option = transaction_rsm.get_current_leader();
                 match leader_option {
                     Some((leader_id, _)) => {
@@ -333,7 +333,7 @@ impl OmniPaxosServer {
             ConsistencyLevel::Linearizable => {
                 info!("{}: Node: {}, Received linearizable command, sending read request to all peers", request_identifier, self.id);
                 let res = self.get_local_result(command.clone()).await;
-                self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { current_idx: self.omni_paxos_instances.get(&RSMIdentifier::TRANSACTION).unwrap().current_decided_idx, value: res }]);
+                self.read_requests.insert(request_identifier.clone(), vec![ResponseValue { current_idx: self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap().current_decided_idx, value: res }]);
                 for peer in &self.peers {
                     self.network.send_to_cluster(*peer, ClusterMessage::ReadRequest(request_identifier.clone(), consistency_level.clone(), command.clone())).await;
                 }

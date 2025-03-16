@@ -13,7 +13,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum RSMIdentifier {
-        TRANSACTION
+        Transaction
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
