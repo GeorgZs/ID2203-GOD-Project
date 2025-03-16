@@ -114,7 +114,6 @@ services:
     networks:
       - postgres-network
     volumes:
-      - ../pg-data/:/var/lib/god_db/data/
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     command: ["postgres"]
 

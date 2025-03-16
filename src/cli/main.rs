@@ -34,7 +34,7 @@ pub async fn main() {
         query_type: DataSourceQueryType::READ,
         data_source_object: None,
         query_params: Some(QueryParams {
-            table_name: String::from("users"),
+            table_name: String::from("food"),
             select_all: true,
             select_columns: None,
         }),

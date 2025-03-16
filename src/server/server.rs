@@ -52,6 +52,7 @@ impl OmniPaxosServer {
 
         let db_config = config.db_config.clone();
         let server_id = config.server_id.clone();
+        let shard_leader_config = config.shard_leader_config.clone();
         let mut server = OmniPaxosServer {
             id: server_id,
             database: Arc::new(Mutex::new(Database::new(db_config).await)),
@@ -64,7 +65,7 @@ impl OmniPaxosServer {
             read_requests: HashMap::new()
         };
 
-        let transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database));
+        let transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config);
         server.omni_paxos_instances.insert(RSMIdentifier::TRANSACTION, OmniPaxosRSM::new(RSMIdentifier::TRANSACTION, server.config.clone(), Box::new(transactions_rsm_consumer)));
         // Save config to output file
         server.save_output().expect("Failed to write to file");

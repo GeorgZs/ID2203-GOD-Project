@@ -9,6 +9,8 @@ pub mod messages {
 
     pub type RequestIdentifier = String;
 
+    pub type TableName = String;
+
     #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum RSMIdentifier {
         TRANSACTION
@@ -66,6 +68,7 @@ pub mod ds {
     use std::fmt::Debug;
     use omnipaxos::{macros::Entry};
     use serde::{Deserialize, Serialize};
+    use crate::common::messages::TableName;
 
     pub type CommandId = usize;
     pub type ClientId = u64;
@@ -89,7 +92,7 @@ pub mod ds {
     }
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceObject {
-        pub table_name: String,
+        pub table_name: TableName,
         pub row_data: Vec<RowData>
     }
 
@@ -121,7 +124,7 @@ pub mod ds {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct QueryParams {
-        pub table_name: String,
+        pub table_name: TableName,
         pub select_all: bool,
         pub select_columns: Option<Vec<String>>,
         //SELECT * from table_name
