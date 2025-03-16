@@ -5,6 +5,7 @@ use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
 use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use rand::distributions::{Alphanumeric, DistString};
 use tokio::time::interval;
 use omnipaxos_kv::common::ds::QueryParams;
 
@@ -163,14 +164,13 @@ impl Client {
 
         let request;
 
+        let unique_identifier = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
+
         match is_write {
-            true => request = ClientMessage::Append(self.next_request_id, write_ds_command),
-            false => request = ClientMessage::Append(self.next_request_id, read_ds_command),
+            true => request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![write_ds_command]}),
+            false => request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![read_ds_command]}),
         };
 
-        let address = self.active_server;
-
-        debug!("HOLA Sending {request:?} to this address {address:?}");
         self.network.send(self.active_server, request).await;
         self.client_data.new_request(is_write);
         self.next_request_id += 1;

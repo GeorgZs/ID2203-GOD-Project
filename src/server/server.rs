@@ -169,8 +169,8 @@ impl OmniPaxosServer {
         println!("Receiving client message: {:?}", messages);
         for (from, message) in messages.drain(..) {
             match message {
-                ClientMessage::Append(command_id, kv_command) => {
-                    self.append_to_log(from, command_id, kv_command)
+                ClientMessage::Append(command_id, tx_cmd) => {
+                    self.append_to_log(from, command_id, tx_cmd)
                 }
                 ClientMessage::Read(request_identifier, consistency_level, ds_command) => {
                     self.handle_datasource_command(request_identifier, consistency_level, ds_command).await
@@ -197,6 +197,15 @@ impl OmniPaxosServer {
             rsm.send_outgoing_msgs().await;
         }
     }
+
+    /* 1) Client sends transaction 1
+        insert into users values ('Mihhail');
+        insert into cakes values ('cookies');
+
+    2) Servers reads transaction and tries to append it to the TRANSACTIONS Omnipaxos;
+    3) Transaction is decided and gets to be handled.
+    4) Each server only gets the queries that is responsible for and appends them to the appropriate omnipaxos instance for each shard;
+    5) When each query is decided on each shard's omnipaxos, every node executes it.*/
 
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
@@ -259,12 +268,14 @@ impl OmniPaxosServer {
         }
     }
 
-    fn append_to_log(&mut self, from: ClientId, command_id: CommandId, ds_command: DataSourceCommand) {
+    fn append_to_log(&mut self, from: ClientId, command_id: CommandId, tx_cmd: TransactionCommand) {
         let command = Command {
             client_id: from,
             coordinator_id: self.id,
             id: command_id,
-            ds_cmd: ds_command,
+            cmd_type: CommandType::TransactionCommand,
+            ds_cmd: None,
+            tx_cmd: Some(tx_cmd)
         };
         self.omni_paxos_instances.get_mut(&RSMIdentifier::TRANSACTION).unwrap()
             .append_to_log(command);

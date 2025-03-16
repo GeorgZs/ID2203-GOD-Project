@@ -1,6 +1,7 @@
 pub mod messages {
     use omnipaxos::{messages::Message as OmniPaxosMessage, util::NodeId};
     use serde::{Deserialize, Serialize};
+    use crate::common::ds::TransactionCommand;
     use super::{
         ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
@@ -37,7 +38,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
-        Append(CommandId, DataSourceCommand),
+        Append(CommandId, TransactionCommand),
         Read(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
     }
 
@@ -62,6 +63,7 @@ pub mod messages {
 }
 
 pub mod ds {
+    use std::fmt::Debug;
     use omnipaxos::{macros::Entry};
     use serde::{Deserialize, Serialize};
 
@@ -75,15 +77,17 @@ pub mod ds {
         pub client_id: ClientId,
         pub coordinator_id: NodeId,
         pub id: CommandId,
-        pub ds_cmd: DataSourceCommand,
+        pub cmd_type: CommandType,
+        pub ds_cmd: Option<DataSourceCommand>,
+        pub tx_cmd: Option<TransactionCommand>,
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct RowData {
         pub row_name: String,
         pub row_value: String
     }
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceObject {
         pub table_name: String,
         pub row_data: Vec<RowData>
@@ -96,14 +100,26 @@ pub mod ds {
         READ
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceCommand {
         pub data_source_object: Option<DataSourceObject>,
         pub query_type: DataSourceQueryType,
         pub query_params: Option<QueryParams>,
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct TransactionCommand {
+        pub tx_id: String,
+        pub data_source_commands: Vec<DataSourceCommand>
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum CommandType {
+        DatasourceCommand,
+        TransactionCommand
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct QueryParams {
         pub table_name: String,
         pub select_all: bool,

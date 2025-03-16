@@ -62,9 +62,9 @@ impl OmniPaxosRSM {
         self.omnipaxos.get_current_leader()
     }
 
-    pub fn append_to_log(&mut self, entry: Command) {
+    pub fn append_to_log(&mut self, command: Command) {
         self.omnipaxos
-            .append(entry)
+            .append(command)
             .expect("Append to Omnipaxos log failed");
     }
 
