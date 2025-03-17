@@ -3,7 +3,7 @@ use std::sync::{Arc};
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
-use omnipaxos_kv::common::messages::{ClusterMessage, ServerMessage, TableName};
+use omnipaxos_kv::common::messages::{ServerMessage, TableName};
 use crate::database::Database;
 use crate::network::Network;
 use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};

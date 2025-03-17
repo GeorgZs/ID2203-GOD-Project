@@ -136,8 +136,10 @@ impl Client {
     async fn send_request(&mut self, is_write: bool) {
         //TODO!!
         //randomly select ds_command as either insert or read
+        let unique_identifier = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
         let write_food_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
             query_type: DataSourceQueryType::INSERT,
             data_source_object: Some(DataSourceObject {
                 table_name: String::from("food"),
@@ -152,6 +154,7 @@ impl Client {
         };
 
         let write_drink_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
             query_type: DataSourceQueryType::INSERT,
             data_source_object: Some(DataSourceObject {
                 table_name: String::from("drink"),
@@ -166,6 +169,7 @@ impl Client {
         };
 
         let write_decoration_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
             query_type: DataSourceQueryType::INSERT,
             data_source_object: Some(DataSourceObject {
                 table_name: String::from("decoration"),
@@ -190,8 +194,6 @@ impl Client {
         };*/
 
         let request;
-
-        let unique_identifier = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
         request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![write_food_ds_command, write_drink_ds_command, write_decoration_ds_command]});
 

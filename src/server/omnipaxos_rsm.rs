@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::sync::Arc;
 use futures::future::BoxFuture;
 use log::{debug, info};
@@ -10,9 +9,8 @@ use omnipaxos::util::{LogEntry, NodeId};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::Command;
-use omnipaxos_kv::common::messages::{ClusterMessage, RSMIdentifier, TableName};
+use omnipaxos_kv::common::messages::{ClusterMessage, RSMIdentifier};
 use crate::configs::OmniPaxosServerConfig;
-use crate::database::Database;
 use crate::network::Network;
 
 pub trait RSMConsumer: Send + Sync {

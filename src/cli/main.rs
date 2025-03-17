@@ -31,6 +31,7 @@ pub async fn main() {
     let unique_identifier =Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
     let ds_command = DataSourceCommand {
+        tx_id: None,
         query_type: DataSourceQueryType::READ,
         data_source_object: None,
         query_params: Some(QueryParams {

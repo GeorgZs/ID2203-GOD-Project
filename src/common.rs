@@ -106,6 +106,7 @@ pub mod ds {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceCommand {
+        pub tx_id: Option<String>,
         pub data_source_object: Option<DataSourceObject>,
         pub query_type: DataSourceQueryType,
         pub query_params: Option<QueryParams>,

@@ -21,6 +21,19 @@ impl Database {
 
     pub async fn handle_command(&mut self, command: DataSourceCommand) -> Option<Option<String>> {
         let query_type = command.query_type.clone();
-        Repository::query(&self.db, self.parser.parse_dso(command).as_str(), query_type).await
+        let tx_id_opt = command.tx_id.clone();
+        match tx_id_opt {
+            None => {
+                Repository::query(&self.db, self.parser.parse_dso(command).as_str(), query_type).await
+            }
+            Some(tx_id_str) => {
+                Repository::query_in_tx(&self.db, tx_id_str, self.parser.parse_dso(command).as_str(), query_type).await
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub async fn commit_tx(&self, tx_id: String) {
+        Repository::commit_tx(&self.db, tx_id).await;
     }
 }

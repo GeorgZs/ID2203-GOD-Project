@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use crate::network::CliNetwork;
-use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
+use crate::omnipaxos_rsm::{OmniPaxosRSM};
 use crate::shard_rsm::ShardRSMConsumer;
 use crate::transactions_rsm::TransactionsRSMConsumer;
 

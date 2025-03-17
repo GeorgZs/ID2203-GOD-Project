@@ -1,11 +1,21 @@
-use deadpool_postgres::{Manager, ManagerConfig, Pool, RecyclingMethod};
+use std::collections::HashMap;
+use std::sync::Arc;
+use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
 use dotenv::dotenv;
+use log::info;
 use serde_json::Value;
+use tokio::sync::Mutex;
 use crate::db::repository::DataSourceConnection;
 use tokio_postgres::{NoTls, Row};
 
 pub struct PGConnection {
     pool: Pool,
+    transaction_connections: Arc<Mutex<HashMap<String, Test>>>
+}
+
+struct Test {
+    counter: usize,
+    conn: Object
 }
 
 impl DataSourceConnection for PGConnection {
@@ -36,9 +46,10 @@ impl DataSourceConnection for PGConnection {
         let pool = Pool::builder(mgr).max_size(16).build().unwrap();
 
         println!("DB connection created!");
-        PGConnection{pool}
+        PGConnection{pool, transaction_connections: Arc::new(Mutex::new(HashMap::new()))}
     }
 
+    // TODO ADD TX_READ
     async fn read(&self, query_string: &str) -> Option<Option<String>> {
         let client = self.pool.get().await.unwrap();
         let stmt = client.prepare(query_string).await.unwrap();
@@ -58,8 +69,6 @@ impl DataSourceConnection for PGConnection {
         }
     }
     async fn write(&self, query_string: &str) {
-        // todo!();
-        println!("Writing to database!");
         let client = self.pool.get().await.unwrap();
         let stmt = client.prepare(query_string).await.unwrap();
         let output = client.query(&stmt, &[]).await;
@@ -68,6 +77,32 @@ impl DataSourceConnection for PGConnection {
             Ok(_) => println!("Write successful!"),
             Err(e) => println!("Error executing query: {:?}", e),
         }
+    }
+    async fn write_in_tx(&self, tx_id: String, query_string: &str) {
+        let conns = Arc::clone(&self.transaction_connections);
+        let mut connections = conns.lock().await;
+        if let None = connections.get(&tx_id) {
+            info!("DB connection doesn't exist: creating it: {:?}", tx_id);
+            let cl = self.pool.get().await.unwrap();
+            connections.insert(tx_id.clone(), Test{counter: 0, conn: cl});
+        }
+        let test = connections.get_mut(&tx_id).unwrap();
+        let stmt = test.conn.prepare(query_string).await.unwrap();
+        let _ = test.conn.query(&stmt, &[]).await;
+        test.counter += 1;
+        info!("Writing in tx: {:?}", tx_id);
+        // TODO REMOVE IN ACTUAL COMMIT
+        if test.counter == 3 {
+            info!("Committing tx: {:?}", tx_id);
+            connections.remove(&tx_id);
+        }
+    }
+
+    async fn commit_tx(&self, tx_id: String) {
+        let conns = Arc::clone(&self.transaction_connections);
+        let mut connections = conns.lock().await;
+        connections.remove(&tx_id);
+        // TODO!! SEND COMMIT MESSAGE AS WELL;
     }
 }
 
