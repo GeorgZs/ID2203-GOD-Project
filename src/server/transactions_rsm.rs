@@ -3,7 +3,7 @@ use std::sync::{Arc};
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
-use omnipaxos_kv::common::messages::{ServerMessage, TableName};
+use omnipaxos_kv::common::messages::{ClusterMessage, ServerMessage, TableName};
 use crate::database::Database;
 use crate::network::Network;
 use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
@@ -11,18 +11,21 @@ use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
 pub struct TransactionsRSMConsumer {
     id: NodeId,
     network: Arc<Network>,
-    database: Arc<Mutex<Database>>,
     shard_leader_config: HashMap<TableName, NodeId>,
     pub shard_leader_rsm: Option<Arc<Mutex<OmniPaxosRSM>>>
 }
 
-impl RSMConsumer for TransactionsRSMConsumer {
-    fn new(id: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> TransactionsRSMConsumer {
-        TransactionsRSMConsumer { id, network, database, shard_leader_config, shard_leader_rsm: None }
+impl TransactionsRSMConsumer {
+    pub fn new(id: NodeId, network: Arc<Network>, _: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> TransactionsRSMConsumer {
+        TransactionsRSMConsumer { id, network, shard_leader_config, shard_leader_rsm: None }
     }
+}
 
-    fn get_network(&self) -> Arc<Network> {
-        Arc::clone(&self.network)
+impl RSMConsumer for TransactionsRSMConsumer {
+    fn send_to_cluster(&self,to: u64,  message: ClusterMessage) -> BoxFuture<()> {
+        Box::pin(async move {
+            self.network.send_to_cluster(to, message).await
+        })
     }
 
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {

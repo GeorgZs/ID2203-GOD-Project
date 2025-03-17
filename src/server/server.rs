@@ -70,9 +70,9 @@ impl OmniPaxosServer {
             read_requests: HashMap::new()
         };
 
-        let food_shard_rsm_consumer = ShardRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
-        let drink_shard_rsm_consumer = ShardRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
-        let decoration_shard_rsm_consumer = ShardRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
+        let food_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database));
+        let drink_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database));
+        let decoration_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database));
 
         let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(FOOD.to_string()), server.config.clone(), Box::new(food_shard_rsm_consumer));
         let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DRINK.to_string()), server.config.clone(), Box::new(drink_shard_rsm_consumer));

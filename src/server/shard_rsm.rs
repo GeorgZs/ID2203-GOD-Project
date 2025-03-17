@@ -3,26 +3,25 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
-use omnipaxos_kv::common::messages::{TableName};
+use omnipaxos_kv::common::messages::{ClusterMessage, TableName};
 use crate::database::Database;
-use crate::network::Network;
 use crate::omnipaxos_rsm::RSMConsumer;
 
 pub struct ShardRSMConsumer {
-    network: Arc<Network>,
     database: Arc<Mutex<Database>>
 }
 
-impl RSMConsumer for ShardRSMConsumer {
-    fn new(_: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, _: HashMap<TableName, NodeId>) -> Self
-    where
-        Self: Sized
-    {
-        ShardRSMConsumer { network, database }
+impl ShardRSMConsumer {
+    pub fn new(database: Arc<Mutex<Database>>) -> Self {
+        ShardRSMConsumer { database }
     }
+}
 
-    fn get_network(&self) -> Arc<Network> {
-        Arc::clone(&self.network)
+impl RSMConsumer for ShardRSMConsumer {
+    fn send_to_cluster(&self,_: u64,  _: ClusterMessage) -> BoxFuture<()> {
+        Box::pin(async move {
+            // Do nothing
+        })
     }
 
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {
