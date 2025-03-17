@@ -16,7 +16,7 @@ use crate::database::Database;
 use crate::network::Network;
 
 pub trait RSMConsumer: Send + Sync {
-    fn send_to_cluster(&self, to: u64, message: ClusterMessage) -> BoxFuture<()>;
+    fn get_network(&self) -> Arc<Network>;
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()>;
 }
 
@@ -75,7 +75,7 @@ impl OmniPaxosRSM {
         for msg in self.omnipaxos_msg_buffer.drain(..) {
             let to = msg.get_receiver();
             let cluster_msg = ClusterMessage::OmniPaxosMessage(self.rsm_identifier.clone(), msg);
-            self.consumer.send_to_cluster(to, cluster_msg).await;
+            self.consumer.get_network().send_to_cluster(to, cluster_msg).await;
         }
     }
 

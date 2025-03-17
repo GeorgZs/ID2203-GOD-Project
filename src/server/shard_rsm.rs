@@ -5,23 +5,23 @@ use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
 use omnipaxos_kv::common::messages::{ClusterMessage, TableName};
 use crate::database::Database;
+use crate::network::Network;
 use crate::omnipaxos_rsm::RSMConsumer;
 
 pub struct ShardRSMConsumer {
-    database: Arc<Mutex<Database>>
+    database: Arc<Mutex<Database>>,
+    network: Arc<Network>
 }
 
 impl ShardRSMConsumer {
-    pub fn new(database: Arc<Mutex<Database>>) -> Self {
-        ShardRSMConsumer { database }
+    pub fn new(database: Arc<Mutex<Database>>, network: Arc<Network>) -> Self {
+        ShardRSMConsumer { database, network }
     }
 }
 
 impl RSMConsumer for ShardRSMConsumer {
-    fn send_to_cluster(&self,_: u64,  _: ClusterMessage) -> BoxFuture<()> {
-        Box::pin(async move {
-            // Do nothing
-        })
+    fn get_network(&self) -> Arc<Network> {
+        Arc::clone(&self.network)
     }
 
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {

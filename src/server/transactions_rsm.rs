@@ -22,10 +22,8 @@ impl TransactionsRSMConsumer {
 }
 
 impl RSMConsumer for TransactionsRSMConsumer {
-    fn send_to_cluster(&self,to: u64,  message: ClusterMessage) -> BoxFuture<()> {
-        Box::pin(async move {
-            self.network.send_to_cluster(to, message).await
-        })
+    fn get_network(&self) -> Arc<Network> {
+        Arc::clone(&self.network)
     }
 
     fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {
