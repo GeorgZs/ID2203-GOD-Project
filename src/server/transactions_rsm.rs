@@ -64,6 +64,7 @@ impl RSMConsumer for TransactionsRSMConsumer {
                                                     client_id,
                                                     coordinator_id: command.coordinator_id,
                                                     id: command_id,
+                                                    two_phase_commit_state: None,
                                                     cmd_type: CommandType::DatasourceCommand,
                                                     ds_cmd: Some(ds_cmd),
                                                     tx_cmd: None

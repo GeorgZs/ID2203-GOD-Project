@@ -339,6 +339,7 @@ impl OmniPaxosServer {
             client_id: from,
             coordinator_id: self.id,
             id: command_id,
+            two_phase_commit_state: None,
             cmd_type: CommandType::TransactionCommand,
             ds_cmd: None,
             tx_cmd: Some(tx_cmd)

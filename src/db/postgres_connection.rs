@@ -121,7 +121,6 @@ impl DataSourceConnection for PGConnection {
 
 }
 
-
 async fn pg_rows_to_json(rows: Vec<Row>) -> Result<String, Box<dyn std::error::Error>> {
     let mut json_rows = Vec::new();
 
