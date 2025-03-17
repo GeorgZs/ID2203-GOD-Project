@@ -1,7 +1,7 @@
 pub mod messages {
     use omnipaxos::{messages::Message as OmniPaxosMessage, util::NodeId};
     use serde::{Deserialize, Serialize};
-    use crate::common::ds::TransactionCommand;
+    use crate::common::ds::{TransactionCommand};
     use super::{
         ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
@@ -13,6 +13,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum RSMIdentifier {
+        Coordinator,
         Transaction,
         Shard(TableName)
     }
@@ -28,6 +29,10 @@ pub mod messages {
     pub enum ClusterMessage {
         OmniPaxosMessage(RSMIdentifier, OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
+        BeginTransaction(Command),
+        BeginTransactionReply(Command),
+        PrepareTransaction(Command),
+        PrepareTransactionReply(Command),
         ReadRequest(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
         ReadResponse(RequestIdentifier, ConsistencyLevel, usize, Option<String>)
     }
@@ -76,11 +81,22 @@ pub mod ds {
     pub type NodeId = omnipaxos::util::NodeId;
     pub type InstanceId = NodeId;
 
+    pub type TransactionId = String;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum TwoPhaseCommitState {
+        Begin,
+        Prepare,
+        Commit,
+        Abort
+    }
+
     #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
     pub struct Command {
         pub client_id: ClientId,
         pub coordinator_id: NodeId,
         pub id: CommandId,
+        pub two_phase_commit_state: Option<TwoPhaseCommitState>,
         pub cmd_type: CommandType,
         pub ds_cmd: Option<DataSourceCommand>,
         pub tx_cmd: Option<TransactionCommand>,
@@ -106,7 +122,7 @@ pub mod ds {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceCommand {
-        pub tx_id: Option<String>,
+        pub tx_id: Option<TransactionId>,
         pub data_source_object: Option<DataSourceObject>,
         pub query_type: DataSourceQueryType,
         pub query_params: Option<QueryParams>,
@@ -114,7 +130,7 @@ pub mod ds {
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct TransactionCommand {
-        pub tx_id: String,
+        pub tx_id: TransactionId,
         pub data_source_commands: Vec<DataSourceCommand>
     }
 

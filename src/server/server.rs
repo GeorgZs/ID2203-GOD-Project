@@ -243,7 +243,8 @@ impl OmniPaxosServer {
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
             trace!("{}: Received {message:?}", self.id);
-            match message {
+            //TODO!!!
+            match message.clone() {
                 ClusterMessage::OmniPaxosMessage(rsm_identifier, m) => {
                     let omnipaxos_instance = self.omni_paxos_instances.get_mut(&rsm_identifier).unwrap();
                     let rsm_clone = Arc::clone(omnipaxos_instance);
@@ -253,6 +254,30 @@ impl OmniPaxosServer {
                 }
                 ClusterMessage::LeaderStartSignal(start_time) => {
                     self.send_client_start_signals(start_time).await;
+                }
+                ClusterMessage::BeginTransaction(command) => {
+                    let db_clone = Arc::clone(&self.database);
+                    let db = db_clone.lock().await;
+                    let cmd = command.clone();
+                    let tx_id = cmd.tx_cmd.unwrap().clone().tx_id.clone();
+                    db.begin_tx(tx_id).await;
+                }
+                ClusterMessage::BeginTransactionReply(_) => {
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let rsm_clone = Arc::clone(coordinator_rsm);
+                    let rsm_mut = rsm_clone.lock().await;
+                    rsm_mut.handle_cluster_message(message).await;
+                }
+                ClusterMessage::PrepareTransaction(command) => {
+                    let db_clone = Arc::clone(&self.database);
+                    let db = db_clone.lock().await;
+                    db.prepare_tx(command.tx_cmd.unwrap().tx_id).await;
+                }
+                ClusterMessage::PrepareTransactionReply(_) => {
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let rsm_clone = Arc::clone(coordinator_rsm);
+                    let rsm_mut = rsm_clone.lock().await;
+                    rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::ReadRequest(request_identifier, consistency_level, command) => {
                     info!("{}: Node: {}, as requested, I am querying database of server: {}", request_identifier, self.id, self.id);

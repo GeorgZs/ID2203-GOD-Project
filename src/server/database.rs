@@ -1,4 +1,4 @@
-use omnipaxos_kv::common::ds::{DataSourceCommand};
+use omnipaxos_kv::common::ds::{DataSourceCommand, TransactionId};
 use omnipaxos_kv::db::postgres_connection::PGConnection;
 use omnipaxos_kv::db::postgres_parser::PGParser;
 use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
@@ -32,8 +32,22 @@ impl Database {
         }
     }
 
+    pub async fn begin_tx(&self, tx_id: TransactionId) {
+        Repository::begin_tx(&self.db, tx_id).await;
+    }
+
     #[allow(dead_code)]
-    pub async fn commit_tx(&self, tx_id: String) {
+    pub async fn prepare_tx(&self, tx_id: TransactionId) {
+        Repository::prepare_tx(&self.db, tx_id).await;
+    }
+
+    #[allow(dead_code)]
+    pub async fn commit_tx(&self, tx_id: TransactionId) {
         Repository::commit_tx(&self.db, tx_id).await;
+    }
+
+    #[allow(dead_code)]
+    pub async fn rollback_tx(&self, tx_id: TransactionId) {
+        Repository::rollback_tx(&self.db, tx_id).await;
     }
 }

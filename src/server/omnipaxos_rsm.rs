@@ -8,14 +8,15 @@ use omnipaxos::storage::{Storage};
 use omnipaxos::util::{LogEntry, NodeId};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use tokio::sync::Mutex;
-use omnipaxos_kv::common::ds::Command;
+use omnipaxos_kv::common::ds::{Command};
 use omnipaxos_kv::common::messages::{ClusterMessage, RSMIdentifier};
 use crate::configs::OmniPaxosServerConfig;
 use crate::network::Network;
 
 pub trait RSMConsumer: Send + Sync {
     fn get_network(&self) -> Arc<Network>;
-    fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()>;
+    fn handle_decided_entries(&mut self, leader_id: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()>;
+    fn handle_cluster_message(&self, message: ClusterMessage) -> BoxFuture<()>;
 }
 
 pub struct OmniPaxosRSM {
@@ -97,6 +98,10 @@ impl OmniPaxosRSM {
 
     pub async fn handle_decided_entries(&mut self) {
         // TODO: Can use a read_raw here to avoid allocation
+        let leader_id = match self.omnipaxos.get_current_leader() {
+            Some((ld_id, _)) => Some(ld_id),
+            None => None
+        };
         let new_decided_idx = self.omnipaxos.get_decided_idx();
         if self.current_decided_idx < new_decided_idx {
             let decided_entries = self
@@ -112,8 +117,12 @@ impl OmniPaxosRSM {
                     _ => unreachable!(),
                 })
                 .collect();
-            let future = self.consumer.handle_decided_entries(decided_commands);
+            let future = self.consumer.handle_decided_entries(leader_id, decided_commands);
             future.await; // Now await it
         }
+    }
+
+    pub async fn handle_cluster_message(&self, message: ClusterMessage) {
+        self.consumer.handle_cluster_message(message).await;
     }
 }

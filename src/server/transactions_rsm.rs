@@ -3,7 +3,7 @@ use std::sync::{Arc};
 use futures::future::BoxFuture;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId};
-use omnipaxos_kv::common::messages::{ServerMessage, TableName};
+use omnipaxos_kv::common::messages::{ClusterMessage, ServerMessage, TableName};
 use crate::database::Database;
 use crate::network::Network;
 use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
@@ -26,7 +26,7 @@ impl RSMConsumer for TransactionsRSMConsumer {
         Arc::clone(&self.network)
     }
 
-    fn handle_decided_entries(&mut self, commands: Vec<Command>) -> BoxFuture<()> {
+    fn handle_decided_entries(&mut self, _: Option<omnipaxos::util::NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
         Box::pin(async move {
             for command in commands {
                 let command_id = command.id.clone();
@@ -83,5 +83,10 @@ impl RSMConsumer for TransactionsRSMConsumer {
                 }
             }
         })
+    }
+
+    fn handle_cluster_message(&self, _: ClusterMessage) -> BoxFuture<()> {
+        //do nothing
+        Box::pin(async move {})
     }
 }

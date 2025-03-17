@@ -7,6 +7,7 @@ use serde_json::Value;
 use tokio::sync::Mutex;
 use crate::db::repository::DataSourceConnection;
 use tokio_postgres::{NoTls, Row};
+use crate::common::ds::TransactionId;
 
 pub struct PGConnection {
     pool: Pool,
@@ -78,7 +79,7 @@ impl DataSourceConnection for PGConnection {
             Err(e) => println!("Error executing query: {:?}", e),
         }
     }
-    async fn write_in_tx(&self, tx_id: String, query_string: &str) {
+    async fn write_in_tx(&self, tx_id: TransactionId, query_string: &str) {
         let conns = Arc::clone(&self.transaction_connections);
         let mut connections = conns.lock().await;
         if let None = connections.get(&tx_id) {
@@ -98,12 +99,26 @@ impl DataSourceConnection for PGConnection {
         }
     }
 
-    async fn commit_tx(&self, tx_id: String) {
-        let conns = Arc::clone(&self.transaction_connections);
-        let mut connections = conns.lock().await;
-        connections.remove(&tx_id);
-        // TODO!! SEND COMMIT MESSAGE AS WELL;
+    async fn begin_tx(&self, tx_id: TransactionId) {
+        //send begin statement to initiate transaction
+        self.write_in_tx(tx_id, "BEGIN;").await;
     }
+
+    async fn prepare_tx(&self, tx_id: TransactionId) {
+        let query_string = format!("PREPARE TRANSACTION {}", tx_id);
+        self.write_in_tx(tx_id, &*query_string).await;
+    }
+
+    async fn commit_tx(&self, tx_id: TransactionId) {
+        let query_string = format!("COMMIT PREPARED {}", tx_id);
+        self.write_in_tx(tx_id, &*query_string).await;
+    }
+
+    async fn rollback_tx(&self, tx_id: TransactionId) {
+        let query_string = format!("ROLLBACK PREPARED {}", tx_id);
+        self.write_in_tx(tx_id, &*query_string).await;
+    }
+
 }
 
 

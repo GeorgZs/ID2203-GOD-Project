@@ -10,6 +10,7 @@ mod server;
 mod omnipaxos_rsm;
 mod transactions_rsm;
 mod shard_rsm;
+mod coordinator_rsm;
 
 #[tokio::main]
 pub async fn main() {

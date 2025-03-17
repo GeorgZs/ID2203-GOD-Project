@@ -1,12 +1,15 @@
 use std::future::Future;
-use crate::common::ds::DataSourceQueryType;
+use crate::common::ds::{DataSourceQueryType, TransactionId};
 
 pub trait DataSourceConnection {
     fn new(host: String, port: String, db: String, user: String, password: String) -> impl Future<Output = Self>;
     fn read(&self, query_string: &str) -> impl Future<Output = Option<Option<String>>>;
     fn write(&self, query_string: &str) -> impl Future<Output = ()>;
-    fn write_in_tx(&self, tx_id: String, query_string: &str) -> impl Future<Output = ()>;
-    fn commit_tx(&self, tx_id: String) -> impl Future<Output = ()>;
+    fn write_in_tx(&self, tx_id: TransactionId, query_string: &str) -> impl Future<Output = ()>;
+    fn commit_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
+    fn begin_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
+    fn rollback_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
+    fn prepare_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
 }
 
 pub struct Repository <T: DataSourceConnection> {
@@ -30,7 +33,7 @@ impl <T: DataSourceConnection> Repository<T> {
         }
     }
 
-    pub async fn query_in_tx(&self, tx_id: String, query_string: &str, query_type: DataSourceQueryType) -> Option<Option<String>> {
+    pub async fn query_in_tx(&self, tx_id: TransactionId, query_string: &str, query_type: DataSourceQueryType) -> Option<Option<String>> {
         match query_type {
             DataSourceQueryType::READ => self.connection.read(query_string).await,
             DataSourceQueryType::INSERT => {
@@ -42,8 +45,19 @@ impl <T: DataSourceConnection> Repository<T> {
         }
     }
 
-    pub async fn commit_tx(&self, tx_id: String) {
+    pub async fn begin_tx(&self, tx_id: TransactionId) {
+        self.connection.begin_tx(tx_id).await;
+    }
+
+    pub async fn prepare_tx(&self, tx_id: TransactionId) {
+        self.connection.prepare_tx(tx_id).await;
+    }
+
+    pub async fn commit_tx(&self, tx_id: TransactionId) {
         self.connection.commit_tx(tx_id).await;
+    }
+    pub async fn rollback_tx(&self, tx_id: TransactionId) {
+        self.connection.rollback_tx(tx_id).await;
     }
 }
 
