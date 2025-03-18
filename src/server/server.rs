@@ -92,9 +92,10 @@ impl OmniPaxosServer {
         let mut transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
         transactions_rsm_consumer.shard_leader_rsm = Some(Arc::clone(server.omni_paxos_instances.get(&leader_shard_rsm_identifier).unwrap()));
         let coordinator_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Coordinator, server.config.clone(), Box::new(transactions_rsm_consumer));
-        let coordinator_rsm_consumer = CoordinatorRSMConsumer::new(server_id, coordinator_omnipaxos_rsm, Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
+        let coordinator_rsm_consumer = CoordinatorRSMConsumer::new(server_id, Arc::clone(&coordinator_omnipaxos_rsm), Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
         let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Box::new(coordinator_rsm_consumer));
         server.omni_paxos_instances.insert(RSMIdentifier::Transaction, transactions_omnipaxos_rsm);
+        server.omni_paxos_instances.insert(RSMIdentifier::Coordinator, coordinator_omnipaxos_rsm);
         server.save_output().expect("Failed to write to file");
         server
     }
@@ -263,28 +264,29 @@ impl OmniPaxosServer {
                     let db = db_clone.lock().await;
                     let cmd = command.clone();
                     let tx_id = cmd.tx_cmd.unwrap().clone().tx_id.clone();
-                    let _ = db.begin_tx(tx_id).await;
+                    let _ = db.begin_tx(tx_id.clone()).await;
+                    self.network.send_to_cluster(1, ClusterMessage::BeginTransactionReply(command)).await;
                 }
                 ClusterMessage::BeginTransactionReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                     let rsm_clone = Arc::clone(coordinator_rsm);
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::WrittenAllQueriesReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                     let rsm_clone = Arc::clone(coordinator_rsm);
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::TransactionError(_, _) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                     let rsm_clone = Arc::clone(coordinator_rsm);
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::PrepareTransactionReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                     let rsm_clone = Arc::clone(coordinator_rsm);
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
