@@ -15,7 +15,7 @@ use crate::network::Network;
 
 pub trait RSMConsumer: Send + Sync {
     fn get_network(&self) -> Arc<Network>;
-    fn handle_decided_entries(&mut self, leader_id: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()>;
+    fn handle_decided_entries(&mut self, leader_id: Option<NodeId>, coordinator_id: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()>;
     fn handle_cluster_message(&self, message: ClusterMessage) -> BoxFuture<()>;
 }
 
@@ -98,8 +98,7 @@ impl OmniPaxosRSM {
         false
     }
 
-    pub async fn handle_decided_entries(&mut self) {
-        // TODO: Can use a read_raw here to avoid allocation
+    pub async fn handle_decided_entries(&mut self, coordinator_id: Option<NodeId>) {
         let leader_id = match self.omnipaxos.get_current_leader() {
             Some((ld_id, _)) => Some(ld_id),
             None => None
@@ -121,8 +120,8 @@ impl OmniPaxosRSM {
                 .collect();
             let cons_cl = Arc::clone(&self.consumer);
             let mut consumer = cons_cl.lock().await;
-            let future = consumer.handle_decided_entries(leader_id, decided_commands);
-            future.await; // Now await it
+            let future = consumer.handle_decided_entries(leader_id, coordinator_id, decided_commands);
+            future.await;
         }
     }
 

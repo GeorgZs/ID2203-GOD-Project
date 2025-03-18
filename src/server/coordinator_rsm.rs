@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use futures::future::BoxFuture;
-use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, NodeId, TransactionId, TwoPhaseCommitState};
@@ -62,10 +61,10 @@ impl RSMConsumer for CoordinatorRSMConsumer {
         Arc::clone(&self.network)
     }
 
-    fn handle_decided_entries(&mut self, leader_id: Option<omnipaxos::util::NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
+    fn handle_decided_entries(&mut self, _: Option<NodeId>, coordinator_id: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
         Box::pin(async move {
-            if let Some(leader_id) = leader_id {
-                if leader_id == self.id {
+            if let Some(coordinator_id) = coordinator_id {
+                if coordinator_id == self.id {
                     for command in commands {
                         match command.cmd_type {
                             TransactionCommand => {

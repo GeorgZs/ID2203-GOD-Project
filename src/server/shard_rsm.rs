@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use futures::future::BoxFuture;
-use log::info;
 use omnipaxos::util::NodeId;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, TransactionId};
@@ -28,7 +27,7 @@ impl RSMConsumer for ShardRSMConsumer {
         Arc::clone(&self.network)
     }
 
-    fn handle_decided_entries(&mut self, _: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
+    fn handle_decided_entries(&mut self, _: Option<NodeId>, coordinator_id: Option<NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
         Box::pin(async move {
             for command in commands {
                 let lock = Arc::clone(&self.database);
@@ -52,11 +51,11 @@ impl RSMConsumer for ShardRSMConsumer {
                                     if let Some(tx_queries_written) = queries_written.get_mut(&tx_id) {
                                         *tx_queries_written += 1;
                                         if *tx_queries_written as usize == number_of_queries {
-                                            //todo coordinator id
-                                            if self.id == 1 {
-                                                let _ = self.network.cluster_message_sender.send((1, ClusterMessage::WrittenAllQueriesReply(cmd))).await;
+                                            let coord_id = coordinator_id.unwrap();
+                                            if self.id == coord_id {
+                                                let _ = self.network.cluster_message_sender.send((coord_id, ClusterMessage::WrittenAllQueriesReply(cmd))).await;
                                             } else {
-                                                self.network.send_to_cluster(1, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
+                                                self.network.send_to_cluster(coord_id, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
                                             }
                                         }
                                     }

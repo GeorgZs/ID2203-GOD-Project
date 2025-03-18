@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::sync::{Arc};
 use futures::future::BoxFuture;
-use log::info;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId, TwoPhaseCommitState};
 use omnipaxos_kv::common::messages::{ClusterMessage, ServerMessage, TableName};
@@ -92,7 +91,7 @@ impl RSMConsumer for TransactionsRSMConsumer {
         Arc::clone(&self.network)
     }
 
-    fn handle_decided_entries(&mut self, _: Option<omnipaxos::util::NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
+    fn handle_decided_entries(&mut self, _: Option<NodeId>, coordinator_id: Option<omnipaxos::util::NodeId>, commands: Vec<Command>) -> BoxFuture<()> {
         Box::pin(async move {
             for command in commands {
                 if let Some(coordinator_command_state) = command.clone().two_phase_commit_state {
@@ -104,19 +103,20 @@ impl RSMConsumer for TransactionsRSMConsumer {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
                             let res = db.prepare_tx(command.clone().tx_id.unwrap()).await;
+                            let coord_id = coordinator_id.unwrap();
                             match res {
                                 Ok(_) => {
-                                    if self.id == 1 {
-                                        let _ = self.network.cluster_message_sender.send((1, ClusterMessage::PrepareTransactionReply(command))).await;
+                                    if self.id == coord_id {
+                                        let _ = self.network.cluster_message_sender.send((coord_id, ClusterMessage::PrepareTransactionReply(command))).await;
                                     } else {
-                                        self.network.send_to_cluster(1, ClusterMessage::PrepareTransactionReply(command)).await;
+                                        self.network.send_to_cluster(coord_id, ClusterMessage::PrepareTransactionReply(command)).await;
                                     }
                                 }
                                 Err(_) => {
-                                    if self.id == 1 {
-                                        let _ = self.network.cluster_message_sender.send((1, ClusterMessage::TransactionError(command, true))).await;
+                                    if self.id == coord_id {
+                                        let _ = self.network.cluster_message_sender.send((coord_id, ClusterMessage::TransactionError(command, true))).await;
                                     } else {
-                                        self.network.send_to_cluster(1, ClusterMessage::TransactionError(command, true)).await;
+                                        self.network.send_to_cluster(coord_id, ClusterMessage::TransactionError(command, true)).await;
                                     }
                                 }
                             }

@@ -233,15 +233,6 @@ impl OmniPaxosServer {
         }
     }
 
-    /* 1) Client sends transaction 1
-        insert into users values ('Mihhail');
-        insert into cakes values ('cookies');
-
-    2) Servers reads transaction and tries to append it to the TRANSACTIONS Omnipaxos;
-    3) Transaction is decided and gets to be handled.
-    4) Each server only gets the queries that is responsible for and appends them to the appropriate omnipaxos instance for each shard;
-    5) When each query is decided on each shard's omnipaxos, every node executes it.*/
-
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
             trace!("{}: Received {message:?}", self.id);
@@ -251,8 +242,21 @@ impl OmniPaxosServer {
                     let omnipaxos_instance = self.omni_paxos_instances.get_mut(&rsm_identifier).unwrap();
                     let rsm_clone = Arc::clone(omnipaxos_instance);
                     let mut rsm_mut = rsm_clone.lock().await;
+                    let coordinator_id = if rsm_identifier != RSMIdentifier::Transaction {
+                        let coord_cl = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                        let coordinator = coord_cl.lock().await;
+                        match coordinator.get_current_leader() {
+                            Some((ld_id, _)) => Some(ld_id),
+                            None => None
+                        }
+                    } else {
+                        match rsm_mut.get_current_leader() {
+                            Some((ld_id, _)) => Some(ld_id),
+                            None => None
+                        }
+                    };
                     rsm_mut.handle_incoming(m);
-                    rsm_mut.handle_decided_entries().await;
+                    rsm_mut.handle_decided_entries(coordinator_id).await;
                 }
                 ClusterMessage::LeaderStartSignal(start_time) => {
                     self.send_client_start_signals(start_time).await;

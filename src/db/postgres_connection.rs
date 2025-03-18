@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
-use log::{debug, error, info};
+use log::{debug};
 use serde_json::Value;
 use tokio::sync::Mutex;
 use crate::db::repository::DataSourceConnection;
