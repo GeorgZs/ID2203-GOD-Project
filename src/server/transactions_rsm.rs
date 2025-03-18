@@ -107,10 +107,18 @@ impl RSMConsumer for TransactionsRSMConsumer {
                             let res = db.prepare_tx(command.clone().tx_id.unwrap()).await;
                             match res {
                                 Ok(_) => {
-                                    self.network.send_to_cluster(1, ClusterMessage::PrepareTransactionReply(command)).await;
+                                    if self.id == 1 {
+                                        let _ = self.network.cluster_message_sender.send((1, ClusterMessage::PrepareTransactionReply(command))).await;
+                                    } else {
+                                        self.network.send_to_cluster(1, ClusterMessage::PrepareTransactionReply(command)).await;
+                                    }
                                 }
                                 Err(_) => {
-                                    self.network.send_to_cluster(1, ClusterMessage::TransactionError(command, true)).await;
+                                    if self.id == 1 {
+                                        let _ = self.network.cluster_message_sender.send((1, ClusterMessage::TransactionError(command, true))).await;
+                                    } else {
+                                        self.network.send_to_cluster(1, ClusterMessage::TransactionError(command, true)).await;
+                                    }
                                 }
                             }
                         }

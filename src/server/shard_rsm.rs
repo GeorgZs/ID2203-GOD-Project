@@ -11,14 +11,15 @@ use crate::network::Network;
 use crate::omnipaxos_rsm::RSMConsumer;
 
 pub struct ShardRSMConsumer {
+    id: NodeId,
     database: Arc<Mutex<Database>>,
     network: Arc<Network>,
     queries_written: Arc<Mutex<HashMap<TransactionId, u64>>>,
 }
 
 impl ShardRSMConsumer {
-    pub fn new(database: Arc<Mutex<Database>>, network: Arc<Network>) -> Self {
-        ShardRSMConsumer { database, network, queries_written: Arc::new(Mutex::new(HashMap::new())) }
+    pub fn new(id: NodeId, database: Arc<Mutex<Database>>, network: Arc<Network>) -> Self {
+        ShardRSMConsumer { id, database, network, queries_written: Arc::new(Mutex::new(HashMap::new())) }
     }
 }
 
@@ -59,7 +60,11 @@ impl RSMConsumer for ShardRSMConsumer {
                                         if *tx_queries_written as usize == number_of_queries {
                                             //todo coordinator id
                                             info!("Written {:?} queries for tx_id: {:?} and replying to coordinator", number_of_queries, tx_id);
-                                            self.network.send_to_cluster(1, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
+                                            if self.id == 1 {
+                                                let _ = self.network.cluster_message_sender.send((1, ClusterMessage::WrittenAllQueriesReply(cmd))).await;
+                                            } else {
+                                                self.network.send_to_cluster(1, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
+                                            }
                                         }
                                     }
                                 }

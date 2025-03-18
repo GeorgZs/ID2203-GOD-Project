@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use futures::future::BoxFuture;
+use log::info;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
-use omnipaxos_kv::common::ds::{Command, CommandType, NodeId, TransactionId, TwoPhaseCommitState};
+use omnipaxos_kv::common::ds::{Command, NodeId, TransactionId, TwoPhaseCommitState};
 use omnipaxos_kv::common::ds::CommandType::TransactionCommand;
 use omnipaxos_kv::common::messages::{ClusterMessage};
 use crate::coordinator_rsm::TwoPhaseCommitAckType::Begin;
@@ -14,6 +15,7 @@ use crate::database::Database;
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
 enum TwoPhaseCommitAckType {
     Begin,
+    Written,
     Prepare
 }
 
@@ -39,8 +41,12 @@ impl CoordinatorRSMConsumer {
                 let ack_resp_cl = Arc::clone(&self.ack_responses);
                 let mut ack_responses = ack_resp_cl.lock().await;
                 if let Some(tx_acks) = ack_responses.get_mut(&tx_id) {
+                    if let None = tx_acks.get(&two_phase_commit_ack_type) {
+                        tx_acks.insert(two_phase_commit_ack_type.clone(), 0);
+                    }
                     if let Some(acks) = tx_acks.get_mut(&two_phase_commit_ack_type) {
                         *acks += 1;
+                        info!("acks for tx_id: {:?}, {:?}", tx_id, two_phase_commit_ack_type);
                         return *acks == self.peers.len() + 1;
                     }
                 }
@@ -135,21 +141,25 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                     }
                 }
                 ClusterMessage::WrittenAllQueriesReply(command) => {
+                    info!("RECEIVED WrittenAllQueriesReply: {:?}", command);
                     let comm = command.clone();
-                    let rsm_cl = Arc::clone(&self.coordinator_rsm);
-                    let mut rsm = rsm_cl.lock().await;
-                    let cmd = Command {
-                        client_id: command.client_id,
-                        coordinator_id: command.coordinator_id,
-                        id: command.id,
-                        tx_id: comm.tx_id,
-                        two_phase_commit_state: Some(TwoPhaseCommitState::Prepare),
-                        total_number_of_commands: None,
-                        cmd_type: command.cmd_type,
-                        ds_cmd: command.ds_cmd,
-                        tx_cmd: command.tx_cmd,
-                    };
-                    rsm.append_to_log(cmd);
+                    let acks_met = self.transaction_reply(command.clone(), TwoPhaseCommitAckType::Written).await;
+                    if acks_met {
+                        let rsm_cl = Arc::clone(&self.coordinator_rsm);
+                        let mut rsm = rsm_cl.lock().await;
+                        let cmd = Command {
+                            client_id: command.client_id,
+                            coordinator_id: command.coordinator_id,
+                            id: command.id,
+                            tx_id: comm.tx_id,
+                            two_phase_commit_state: Some(TwoPhaseCommitState::Prepare),
+                            total_number_of_commands: None,
+                            cmd_type: command.cmd_type,
+                            ds_cmd: command.ds_cmd,
+                            tx_cmd: command.tx_cmd,
+                        };
+                        rsm.append_to_log(cmd);
+                    }
                 }
                 ClusterMessage::TransactionError(command, prepared) => {
                     let rsm_cl = Arc::clone(&self.coordinator_rsm);

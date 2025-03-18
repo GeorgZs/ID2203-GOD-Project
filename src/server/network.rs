@@ -123,7 +123,7 @@ pub struct Network {
     max_client_id: Arc<Mutex<ClientId>>,
     batch_size: usize,
     client_message_sender: Sender<(ClientId, ClientMessage)>,
-    cluster_message_sender: Sender<(NodeId, ClusterMessage)>,
+    pub cluster_message_sender: Sender<(NodeId, ClusterMessage)>,
     pub cluster_messages: Arc<Mutex<Receiver<(NodeId, ClusterMessage)>>>,
     pub client_messages: Arc<Mutex<Receiver<(ClientId, ClientMessage)>>>,
     cancel_token: CancellationToken,
