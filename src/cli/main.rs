@@ -20,7 +20,7 @@ struct Args {
     consistency: String,
 
     #[arg(short, long)]
-    action: String,
+    table_name: String,
 }
 
 #[tokio::main]
@@ -35,7 +35,7 @@ pub async fn main() {
         query_type: DataSourceQueryType::READ,
         data_source_object: None,
         query_params: Some(QueryParams {
-            table_name: String::from("food"),
+            table_name: args.table_name,
             select_all: true,
             select_columns: None,
         }),
