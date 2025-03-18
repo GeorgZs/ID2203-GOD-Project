@@ -105,19 +105,25 @@ impl DataSourceConnection for PGConnection {
     }
 
     async fn prepare_tx(&self, tx_id: TransactionId) {
-        let query_string = format!("PREPARE TRANSACTION {}", tx_id);
+        let query_string = format!("PREPARE TRANSACTION {};", tx_id);
         self.write_in_tx(tx_id, &*query_string).await;
     }
 
     async fn commit_tx(&self, tx_id: TransactionId) {
-        let query_string = format!("COMMIT PREPARED {}", tx_id);
+        let query_string = format!("COMMIT PREPARED {};", tx_id);
         self.write_in_tx(tx_id, &*query_string).await;
     }
 
     async fn rollback_tx(&self, tx_id: TransactionId) {
-        let query_string = format!("ROLLBACK PREPARED {}", tx_id);
+        let query_string = format!("ROLLBACK;");
         self.write_in_tx(tx_id, &*query_string).await;
     }
+
+    async fn rollback_prepared_tx(&self, tx_id: TransactionId) {
+        let query_string = format!("ROLLBACK PREPARED {};", tx_id);
+        self.write_in_tx(tx_id, &*query_string).await;
+    }
+    
 
 }
 

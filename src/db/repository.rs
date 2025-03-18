@@ -8,8 +8,9 @@ pub trait DataSourceConnection {
     fn write_in_tx(&self, tx_id: TransactionId, query_string: &str) -> impl Future<Output = ()>;
     fn commit_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
     fn begin_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
-    fn rollback_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
     fn prepare_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
+    fn rollback_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
+    fn rollback_prepared_tx(&self, tx_id: TransactionId) -> impl Future<Output = ()>;
 }
 
 pub struct Repository <T: DataSourceConnection> {
@@ -58,6 +59,10 @@ impl <T: DataSourceConnection> Repository<T> {
     }
     pub async fn rollback_tx(&self, tx_id: TransactionId) {
         self.connection.rollback_tx(tx_id).await;
+    }
+
+    pub async fn rollback_prepared_tx(&self, tx_id: TransactionId) {
+        self.connection.rollback_prepared_tx(tx_id).await;
     }
 }
 

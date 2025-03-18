@@ -50,4 +50,9 @@ impl Database {
     pub async fn rollback_tx(&self, tx_id: TransactionId) {
         Repository::rollback_tx(&self.db, tx_id).await;
     }
+
+    #[allow(dead_code)]
+    pub async fn rollback_prepared_tx(&self, tx_id: TransactionId) {
+        Repository::rollback_prepared_tx(&self.db, tx_id).await;
+    }
 }
