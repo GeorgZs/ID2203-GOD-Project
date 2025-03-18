@@ -25,11 +25,11 @@ pub struct OmniPaxosRSM {
     omnipaxos: OmniPaxos<Command, MemoryStorage<Command>>,
     pub current_decided_idx: usize,
     omnipaxos_msg_buffer: Vec<Message<Command>>,
-    consumer: Box<dyn RSMConsumer>,
+    consumer: Arc<Mutex<dyn RSMConsumer>>,
 }
 
 impl OmniPaxosRSM {
-    pub fn new(rsm_identifier: RSMIdentifier, config: OmniPaxosServerConfig, consumer: Box<dyn RSMConsumer>) -> Arc<Mutex<OmniPaxosRSM>> {
+    pub fn new(rsm_identifier: RSMIdentifier, config: OmniPaxosServerConfig, consumer: Arc<Mutex<dyn RSMConsumer>>) -> Arc<Mutex<OmniPaxosRSM>> {
         let mut storage: MemoryStorage<Command> = MemoryStorage::default();
         let server_id = config.server_id.clone();
         let init_leader_ballot = Ballot {
@@ -74,7 +74,9 @@ impl OmniPaxosRSM {
         for msg in self.omnipaxos_msg_buffer.drain(..) {
             let to = msg.get_receiver();
             let cluster_msg = ClusterMessage::OmniPaxosMessage(self.rsm_identifier.clone(), msg);
-            self.consumer.get_network().send_to_cluster(to, cluster_msg).await;
+            let cons_cl = Arc::clone(&self.consumer);
+            let consumer = cons_cl.lock().await;
+            consumer.get_network().send_to_cluster(to, cluster_msg).await;
         }
     }
 
@@ -117,12 +119,16 @@ impl OmniPaxosRSM {
                     _ => unreachable!(),
                 })
                 .collect();
-            let future = self.consumer.handle_decided_entries(leader_id, decided_commands);
+            let cons_cl = Arc::clone(&self.consumer);
+            let mut consumer = cons_cl.lock().await;
+            let future = consumer.handle_decided_entries(leader_id, decided_commands);
             future.await; // Now await it
         }
     }
 
     pub async fn handle_cluster_message(&self, message: ClusterMessage) {
-        self.consumer.handle_cluster_message(message).await;
+        let cons_cl = Arc::clone(&self.consumer);
+        let consumer = cons_cl.lock().await;
+        consumer.handle_cluster_message(message).await;
     }
 }

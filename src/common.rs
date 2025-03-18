@@ -98,6 +98,7 @@ pub mod ds {
         pub client_id: ClientId,
         pub coordinator_id: NodeId,
         pub id: CommandId,
+        pub tx_id: Option<TransactionId>,
         pub two_phase_commit_state: Option<TwoPhaseCommitState>,
         pub total_number_of_commands: Option<usize>,
         pub cmd_type: CommandType,

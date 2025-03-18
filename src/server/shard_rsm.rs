@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use futures::future::BoxFuture;
+use log::info;
 use omnipaxos::util::NodeId;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, TransactionId};
@@ -35,22 +36,32 @@ impl RSMConsumer for ShardRSMConsumer {
                     CommandType::DatasourceCommand => {
                         let cmd = command.clone();
                         let ds_cmd = command.ds_cmd.unwrap();
-                        let tx_id = ds_cmd.tx_id.clone();
+                        let tx_id_opt = ds_cmd.tx_id.clone();
                         let res = db.handle_command(ds_cmd.clone()).await;
                         if let Some(number_of_queries) = command.total_number_of_commands {
-                            if res.is_err() {
-                                self.network.send_to_cluster(1, ClusterMessage::TransactionError(cmd, false)).await;
-                            } else {
-                                let qw_cl = Arc::clone(&self.queries_written);
-                                let mut queries_written = qw_cl.lock().await;
-                                if let None = queries_written.get_mut(&tx_id.clone().unwrap()) {
-                                    queries_written.insert(tx_id.clone().unwrap(), 0);
-                                }
-                                let tx_queries_written = queries_written.get_mut(&tx_id.unwrap()).unwrap();
-                                *tx_queries_written += 1;
-                                if *tx_queries_written as usize == number_of_queries {
-                                    //todo coordinator id
-                                    self.network.send_to_cluster(1, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
+                            if let Some(tx_id) = tx_id_opt {
+                                info!("Number of queries: {:?}", number_of_queries);
+                                if res.is_err() {
+                                    info!("Error writing query for tx_id: {:?}", tx_id);
+                                    self.network.send_to_cluster(1, ClusterMessage::TransactionError(cmd, false)).await;
+                                } else {
+                                    let qw_cl = Arc::clone(&self.queries_written);
+                                    let mut queries_written = qw_cl.lock().await;
+                                    if queries_written.get(&tx_id).is_none() {
+                                        info!("Tx ID does not exist for tx_id: {:?}", tx_id);
+                                        queries_written.insert(tx_id.clone(), 0);
+                                    }
+                                    if let Some(tx_queries_written) = queries_written.get_mut(&tx_id) {
+                                        *tx_queries_written += 1;
+                                        info!("{:?}, *tx_queries_written as usize: {:?}", tx_id, *tx_queries_written as usize);
+                                        info!("number_of_queries: {:?}", number_of_queries);
+                                        info!("result: {:?}", *tx_queries_written as usize == number_of_queries);
+                                        if *tx_queries_written as usize == number_of_queries {
+                                            //todo coordinator id
+                                            info!("Written {:?} queries for tx_id: {:?} and replying to coordinator", number_of_queries, tx_id);
+                                            self.network.send_to_cluster(1, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
+                                        }
+                                    }
                                 }
                             }
                         }

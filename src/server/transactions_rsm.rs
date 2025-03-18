@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc};
 use futures::future::BoxFuture;
+use log::info;
 use tokio::sync::Mutex;
 use omnipaxos_kv::common::ds::{Command, CommandType, NodeId, TwoPhaseCommitState};
 use omnipaxos_kv::common::messages::{ClusterMessage, ServerMessage, TableName};
@@ -46,9 +47,11 @@ impl TransactionsRSMConsumer {
                     }
                 }
                 CommandType::TransactionCommand => {
+                    let cmd = command.clone();
                     let ds_cmds = command.tx_cmd.unwrap().data_source_commands;
                     let len = ds_cmds.len().clone();
                     for ds_cmd in ds_cmds {
+                        let tx_id = cmd.tx_id.clone();
                         if let Some(ref ds_obj) = ds_cmd.data_source_object {
                             if let Some(leader_id) = self.shard_leader_config.get(&ds_obj.table_name) {
                                 if self.id == *leader_id {
@@ -60,6 +63,7 @@ impl TransactionsRSMConsumer {
                                                 client_id,
                                                 coordinator_id: command.coordinator_id,
                                                 id: command_id,
+                                                tx_id,
                                                 total_number_of_commands: Some(len),
                                                 two_phase_commit_state: None,
                                                 cmd_type: CommandType::DatasourceCommand,
@@ -99,7 +103,8 @@ impl RSMConsumer for TransactionsRSMConsumer {
                         TwoPhaseCommitState::Prepare => {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
-                            let res = db.prepare_tx(command.clone().tx_cmd.unwrap().tx_id).await;
+                            info!("Prepare message decided: {:?}", command.clone().tx_id.unwrap());
+                            let res = db.prepare_tx(command.clone().tx_id.unwrap()).await;
                             match res {
                                 Ok(_) => {
                                     self.network.send_to_cluster(1, ClusterMessage::PrepareTransactionReply(command)).await;
@@ -112,12 +117,12 @@ impl RSMConsumer for TransactionsRSMConsumer {
                         TwoPhaseCommitState::Commit => {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
-                            let _ = db.commit_tx(command.tx_cmd.unwrap().tx_id).await;
+                            let _ = db.commit_tx(command.tx_id.unwrap()).await;
                         }
                         TwoPhaseCommitState::Rollback => {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
-                            let _ = db.rollback_tx(command.tx_cmd.unwrap().tx_id).await;
+                            let _ = db.rollback_tx(command.tx_id.unwrap()).await;
                         }
                         TwoPhaseCommitState::RollbackPrepared => {
                             let lock = Arc::clone(&self.database);

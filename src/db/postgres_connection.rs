@@ -10,12 +10,7 @@ use crate::common::ds::TransactionId;
 
 pub struct PGConnection {
     pool: Pool,
-    transaction_connections: Arc<Mutex<HashMap<String, Test>>>
-}
-
-struct Test {
-    counter: usize,
-    conn: Object
+    transaction_connections: Arc<Mutex<HashMap<String, Object>>>
 }
 
 impl DataSourceConnection for PGConnection {
@@ -75,18 +70,11 @@ impl DataSourceConnection for PGConnection {
         if let None = connections.get(&tx_id) {
             info!("DB connection doesn't exist: creating it: {:?}", tx_id);
             let cl = self.pool.get().await.unwrap();
-            connections.insert(tx_id.clone(), Test{counter: 0, conn: cl});
+            connections.insert(tx_id.clone(), cl);
         }
-        let test = connections.get_mut(&tx_id).unwrap();
-        let stmt = test.conn.prepare(query_string).await.unwrap();
-        let result = test.conn.query(&stmt, &[]).await;
-        test.counter += 1;
-        info!("Writing in tx: {:?}", tx_id);
-        // TODO REMOVE IN ACTUAL COMMIT
-        if test.counter == 3 {
-            info!("Committing tx: {:?}", tx_id);
-            connections.remove(&tx_id);
-        }
+        let conn = connections.get_mut(&tx_id).unwrap();
+        let stmt = conn.prepare(query_string).await.unwrap();
+        let result = conn.query(&stmt, &[]).await;
         match result {
             Ok(_) => {Ok(None)}
             Err(_) => {Err(())}
@@ -99,23 +87,36 @@ impl DataSourceConnection for PGConnection {
     }
 
     async fn prepare_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
-        let query_string = format!("PREPARE TRANSACTION {};", tx_id);
+        let query_string = format!("PREPARE TRANSACTION '{}';", tx_id);
         self.write_in_tx(tx_id, &*query_string).await
     }
 
     async fn commit_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
-        let query_string = format!("COMMIT PREPARED {};", tx_id);
-        self.write_in_tx(tx_id, &*query_string).await
+        let query_string = format!("COMMIT PREPARED '{}';", tx_id);
+        let res = self.write_in_tx(tx_id.clone(), &*query_string).await;
+        let conns_cl = self.transaction_connections.clone();
+        let mut connections = conns_cl.lock().await;
+        connections.remove(&tx_id);
+        res
     }
 
     async fn rollback_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
         let query_string = format!("ROLLBACK;");
-        self.write_in_tx(tx_id, &*query_string).await
+        let res = self.write_in_tx(tx_id.clone(), &*query_string).await;
+        let conns_cl = self.transaction_connections.clone();
+        let mut connections = conns_cl.lock().await;
+        connections.remove(&tx_id);
+        res
+
     }
 
     async fn rollback_prepared_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
-        let query_string = format!("ROLLBACK PREPARED {};", tx_id);
-        self.write_in_tx(tx_id, &*query_string).await
+        let query_string = format!("ROLLBACK PREPARED '{}';", tx_id);
+        let res = self.write_in_tx(tx_id.clone(), &*query_string).await;
+        let conns_cl = self.transaction_connections.clone();
+        let mut connections = conns_cl.lock().await;
+        connections.remove(&tx_id);
+        res
     }
     
 

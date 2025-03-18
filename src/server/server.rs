@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use crate::coordinator_rsm::CoordinatorRSMConsumer;
 use crate::network::CliNetwork;
-use crate::omnipaxos_rsm::{OmniPaxosRSM};
+use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
 use crate::shard_rsm::ShardRSMConsumer;
 use crate::transactions_rsm::TransactionsRSMConsumer;
 
@@ -71,13 +71,11 @@ impl OmniPaxosServer {
             read_requests: HashMap::new()
         };
 
-        let food_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database), Arc::clone(&server.network));
-        let drink_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database), Arc::clone(&server.network));
-        let decoration_shard_rsm_consumer = ShardRSMConsumer::new(Arc::clone(&server.database), Arc::clone(&server.network));
+        let shard_rsm_consumer = Arc::new(Mutex::new(ShardRSMConsumer::new(Arc::clone(&server.database), Arc::clone(&server.network))));
 
-        let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(FOOD.to_string()), server.config.clone(), Box::new(food_shard_rsm_consumer));
-        let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DRINK.to_string()), server.config.clone(), Box::new(drink_shard_rsm_consumer));
-        let decoration_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DECORATION.to_string()), server.config.clone(), Box::new(decoration_shard_rsm_consumer));
+        let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(FOOD.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
+        let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DRINK.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
+        let decoration_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DECORATION.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
 
         server.omni_paxos_instances.insert(RSMIdentifier::Shard(FOOD.to_string()), food_omnipaxos_rsm);
         server.omni_paxos_instances.insert(RSMIdentifier::Shard(DRINK.to_string()), drink_omnipaxos_rsm);
@@ -91,9 +89,9 @@ impl OmniPaxosServer {
 
         let mut transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
         transactions_rsm_consumer.shard_leader_rsm = Some(Arc::clone(server.omni_paxos_instances.get(&leader_shard_rsm_identifier).unwrap()));
-        let coordinator_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Coordinator, server.config.clone(), Box::new(transactions_rsm_consumer));
+        let coordinator_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Coordinator, server.config.clone(), Arc::new(Mutex::new(transactions_rsm_consumer)) as Arc<Mutex<dyn RSMConsumer>>);
         let coordinator_rsm_consumer = CoordinatorRSMConsumer::new(server_id, Arc::clone(&coordinator_omnipaxos_rsm), Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
-        let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Box::new(coordinator_rsm_consumer));
+        let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Arc::new(Mutex::new(coordinator_rsm_consumer)) as Arc<Mutex<dyn RSMConsumer>>);
         server.omni_paxos_instances.insert(RSMIdentifier::Transaction, transactions_omnipaxos_rsm);
         server.omni_paxos_instances.insert(RSMIdentifier::Coordinator, coordinator_omnipaxos_rsm);
         server.save_output().expect("Failed to write to file");
@@ -199,7 +197,6 @@ impl OmniPaxosServer {
     }
 
     async fn handle_client_messages(&mut self, messages: &mut Vec<(ClientId, ClientMessage)>) {
-        println!("Receiving client message: {:?}", messages);
         for (from, message) in messages.drain(..) {
             match message {
                 ClientMessage::Append(command_id, tx_cmd) => {
@@ -263,9 +260,11 @@ impl OmniPaxosServer {
                     let db_clone = Arc::clone(&self.database);
                     let db = db_clone.lock().await;
                     let cmd = command.clone();
-                    let tx_id = cmd.tx_cmd.unwrap().clone().tx_id.clone();
-                    let _ = db.begin_tx(tx_id.clone()).await;
-                    self.network.send_to_cluster(1, ClusterMessage::BeginTransactionReply(command)).await;
+                    let tx_id_opt = cmd.tx_id.clone();
+                    if let Some(tx_id) = tx_id_opt {
+                        let _ = db.begin_tx(tx_id.clone()).await;
+                        self.network.send_to_cluster(1, ClusterMessage::BeginTransactionReply(command)).await;
+                    }
                 }
                 ClusterMessage::BeginTransactionReply(_) => {
                     let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
@@ -361,6 +360,7 @@ impl OmniPaxosServer {
             client_id: from,
             coordinator_id: self.id,
             id: command_id,
+            tx_id: Some(tx_cmd.tx_id.clone()),
             total_number_of_commands: None,
             two_phase_commit_state: None,
             cmd_type: CommandType::TransactionCommand,
