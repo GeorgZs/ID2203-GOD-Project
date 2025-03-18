@@ -22,6 +22,7 @@ enum TwoPhaseCommitAckType {
 pub struct CoordinatorRSMConsumer {
     id: NodeId,
     coordinator_rsm: Arc<Mutex<OmniPaxosRSM>>,
+
     network: Arc<Network>,
     database: Arc<Mutex<Database>>,
     peers: Vec<NodeId>,
@@ -68,7 +69,7 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                 if leader_id == self.id {
                     for command in commands {
                         match command.cmd_type {
-                            CommandType::TransactionCommand => {
+                            TransactionCommand => {
                                 let cmd = command.clone();
                                 let tx_id_opt = cmd.tx_id.clone();
                                 if let Some(tx_id) = tx_id_opt {
@@ -113,7 +114,7 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                             tx_id: comm.tx_id,
                             two_phase_commit_state: Some(TwoPhaseCommitState::Begin),
                             total_number_of_commands: None,
-                            cmd_type: CommandType::TransactionCommand,
+                            cmd_type: TransactionCommand,
                             ds_cmd: None,
                             tx_cmd: command.tx_cmd,
                         };

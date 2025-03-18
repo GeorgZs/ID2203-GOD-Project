@@ -71,12 +71,13 @@ impl OmniPaxosServer {
             read_requests: HashMap::new()
         };
 
-        let shard_rsm_consumer = Arc::new(Mutex::new(ShardRSMConsumer::new(Arc::clone(&server.database), Arc::clone(&server.network))));
+        let shard_rsm_consumer = Arc::new(Mutex::new(ShardRSMConsumer::new(server.id, Arc::clone(&server.database), Arc::clone(&server.network))));
 
         let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(FOOD.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
         let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DRINK.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
         let decoration_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DECORATION.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
 
+        // Add rsm to omnipaxos instances
         server.omni_paxos_instances.insert(RSMIdentifier::Shard(FOOD.to_string()), food_omnipaxos_rsm);
         server.omni_paxos_instances.insert(RSMIdentifier::Shard(DRINK.to_string()), drink_omnipaxos_rsm);
         server.omni_paxos_instances.insert(RSMIdentifier::Shard(DECORATION.to_string()), decoration_omnipaxos_rsm);
