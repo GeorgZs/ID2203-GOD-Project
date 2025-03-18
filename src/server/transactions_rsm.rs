@@ -127,7 +127,7 @@ impl RSMConsumer for TransactionsRSMConsumer {
                         TwoPhaseCommitState::RollbackPrepared => {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
-                            let _ = db.rollback_prepared_tx(command.tx_cmd.unwrap().tx_id).await;
+                            let _ = db.rollback_prepared_tx(command.tx_id.unwrap()).await;
                         }
                     }
                 }
