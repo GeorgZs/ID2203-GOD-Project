@@ -103,7 +103,6 @@ impl RSMConsumer for TransactionsRSMConsumer {
                         TwoPhaseCommitState::Prepare => {
                             let lock = Arc::clone(&self.database);
                             let db = lock.lock().await;
-                            info!("Prepare message decided: {:?}", command.clone().tx_id.unwrap());
                             let res = db.prepare_tx(command.clone().tx_id.unwrap()).await;
                             match res {
                                 Ok(_) => {

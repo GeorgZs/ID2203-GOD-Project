@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
-use log::{error, info};
+use log::{debug, error, info};
 use serde_json::Value;
 use tokio::sync::Mutex;
 use crate::db::repository::DataSourceConnection;
@@ -29,8 +29,6 @@ impl DataSourceConnection for PGConnection {
         // Create the connection pool
         let mgr = Manager::from_config(config, NoTls, mgr_config);
         let pool = Pool::builder(mgr).max_size(16).build().unwrap();
-
-        println!("DB connection created!");
         PGConnection{pool, transaction_connections: Arc::new(Mutex::new(HashMap::new()))}
     }
 
@@ -48,7 +46,7 @@ impl DataSourceConnection for PGConnection {
                 }
             },
             Err(e) => {
-                println!("Error executing query: {:?}", e);
+                debug!("Error executing query: {:?}", e);
                 Err(())
             }
         }
@@ -59,8 +57,8 @@ impl DataSourceConnection for PGConnection {
         let output = client.query(&stmt, &[]).await;
 
         match output {
-            Ok(_) => println!("Write successful!"),
-            Err(e) => println!("Error executing query: {:?}", e),
+            Ok(_) => {},
+            Err(e) => debug!("Error executing query: {:?}", e),
         }
         Ok(None)
     }
@@ -68,7 +66,6 @@ impl DataSourceConnection for PGConnection {
         let conns = Arc::clone(&self.transaction_connections);
         let mut connections = conns.lock().await;
         if let None = connections.get(&tx_id) {
-            info!("DB connection doesn't exist: creating it: {:?}", tx_id);
             let cl = self.pool.get().await.unwrap();
             connections.insert(tx_id.clone(), cl);
         }
@@ -78,7 +75,7 @@ impl DataSourceConnection for PGConnection {
         match result {
             Ok(_) => {Ok(None)}
             Err(e) => {
-                error!("Error executing query: {:?}", e);
+                debug!("Error executing query: {:?}", e);
                 Err(())
             }
         }

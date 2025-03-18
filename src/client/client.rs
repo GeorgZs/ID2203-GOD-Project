@@ -123,7 +123,6 @@ impl Client {
     }
 
     fn handle_server_message(&mut self, msg: ServerMessage) {
-        debug!("Recieved {msg:?}");
         match msg {
             ServerMessage::StartSignal(_) => (),
             server_response => {

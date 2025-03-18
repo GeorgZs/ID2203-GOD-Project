@@ -329,7 +329,7 @@ impl Network {
             let to_address = match get_node_addr(&self.cluster_name, peer, self.is_local) {
                 Ok(addr) => addr,
                 Err(e) => {
-                    log::error!("Error resolving DNS name of node {peer}: {e}");
+                    error!("Error resolving DNS name of node {peer}: {e}");
                     return;
                 }
             };

@@ -47,7 +47,6 @@ impl CoordinatorRSMConsumer {
                     }
                     if let Some(acks) = tx_acks.get_mut(&two_phase_commit_ack_type) {
                         *acks += 1;
-                        info!("acks for tx_id: {:?}, {:?}", tx_id, two_phase_commit_ack_type);
                         return *acks == self.peers.len() + 1;
                     }
                 }
@@ -142,7 +141,6 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                     }
                 }
                 ClusterMessage::WrittenAllQueriesReply(command) => {
-                    info!("RECEIVED WrittenAllQueriesReply: {:?}", command);
                     let comm = command.clone();
                     let acks_met = self.transaction_reply(command.clone(), TwoPhaseCommitAckType::Written).await;
                     if acks_met {
