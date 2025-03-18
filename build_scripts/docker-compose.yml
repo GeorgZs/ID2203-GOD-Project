@@ -115,7 +115,7 @@ services:
       - postgres-network
     volumes:
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: ["postgres"]
+    command: ["postgres", "-c", "max_prepared_transactions=100"]
 
   db2:
     image: postgres:latest
@@ -132,7 +132,7 @@ services:
     volumes:
       - ../pg-data/:/var/lib/god_db/data/
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: ["postgres"]
+    command: ["postgres", "-c", "max_prepared_transactions=100"]
 
   db3:
     image: postgres:latest
@@ -149,7 +149,7 @@ services:
     volumes:
       - ../pg-data/:/var/lib/god_db/data/
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-    command: ["postgres"]
+    command: ["postgres", "-c", "max_prepared_transactions=100"]
 
   adminer:
     image: adminer

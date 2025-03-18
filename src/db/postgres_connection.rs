@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use deadpool_postgres::{Manager, ManagerConfig, Object, Pool, RecyclingMethod};
-use log::info;
+use log::{error, info};
 use serde_json::Value;
 use tokio::sync::Mutex;
 use crate::db::repository::DataSourceConnection;
@@ -77,7 +77,10 @@ impl DataSourceConnection for PGConnection {
         let result = conn.query(&stmt, &[]).await;
         match result {
             Ok(_) => {Ok(None)}
-            Err(_) => {Err(())}
+            Err(e) => {
+                error!("Error executing query: {:?}", e);
+                Err(())
+            }
         }
     }
 
