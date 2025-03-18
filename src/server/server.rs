@@ -9,6 +9,7 @@ use std::{fs::File, io::Write, time::Duration};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use crate::coordinator_rsm::CoordinatorRSMConsumer;
 use crate::network::CliNetwork;
 use crate::omnipaxos_rsm::{OmniPaxosRSM};
 use crate::shard_rsm::ShardRSMConsumer;
@@ -90,7 +91,9 @@ impl OmniPaxosServer {
 
         let mut transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
         transactions_rsm_consumer.shard_leader_rsm = Some(Arc::clone(server.omni_paxos_instances.get(&leader_shard_rsm_identifier).unwrap()));
-        let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Box::new(transactions_rsm_consumer));
+        let coordinator_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Coordinator, server.config.clone(), Box::new(transactions_rsm_consumer));
+        let coordinator_rsm_consumer = CoordinatorRSMConsumer::new(server_id, coordinator_omnipaxos_rsm, Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
+        let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Box::new(coordinator_rsm_consumer));
         server.omni_paxos_instances.insert(RSMIdentifier::Transaction, transactions_omnipaxos_rsm);
         server.save_output().expect("Failed to write to file");
         server
@@ -260,7 +263,7 @@ impl OmniPaxosServer {
                     let db = db_clone.lock().await;
                     let cmd = command.clone();
                     let tx_id = cmd.tx_cmd.unwrap().clone().tx_id.clone();
-                    db.begin_tx(tx_id).await;
+                    let _ = db.begin_tx(tx_id).await;
                 }
                 ClusterMessage::BeginTransactionReply(_) => {
                     let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
@@ -268,10 +271,17 @@ impl OmniPaxosServer {
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
                 }
-                ClusterMessage::PrepareTransaction(command) => {
-                    let db_clone = Arc::clone(&self.database);
-                    let db = db_clone.lock().await;
-                    db.prepare_tx(command.tx_cmd.unwrap().tx_id).await;
+                ClusterMessage::WrittenAllQueriesReply(_) => {
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let rsm_clone = Arc::clone(coordinator_rsm);
+                    let rsm_mut = rsm_clone.lock().await;
+                    rsm_mut.handle_cluster_message(message).await;
+                }
+                ClusterMessage::TransactionError(_, _) => {
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
+                    let rsm_clone = Arc::clone(coordinator_rsm);
+                    let rsm_mut = rsm_clone.lock().await;
+                    rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::PrepareTransactionReply(_) => {
                     let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Coordinator).unwrap();
@@ -285,13 +295,23 @@ impl OmniPaxosServer {
                     let mut db = db_clone.lock().await;
                     let res = db.handle_command(command).await;
                     match res {
-                        Some(opt) => {
-                            let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
-                            let rsm_clone = Arc::clone(transaction_rsm);
-                            let rsm_mut = rsm_clone.lock().await;
-                            self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, rsm_mut.current_decided_idx, opt)).await;
-                        }
-                        None => {
+                        Ok(option) => {
+                            match option {
+                                Some(opt) => {
+                                    let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                                    let rsm_clone = Arc::clone(transaction_rsm);
+                                    let rsm_mut = rsm_clone.lock().await;
+                                    self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, rsm_mut.current_decided_idx, opt)).await;
+                                }
+                                None => {
+                                    let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                                    let rsm_clone = Arc::clone(transaction_rsm);
+                                    let rsm_mut = rsm_clone.lock().await;
+                                    self.network.send_to_cluster(_from, ClusterMessage::ReadResponse(request_identifier, consistency_level, rsm_mut.current_decided_idx, None)).await;
+                                }
+                            }
+                        },
+                        Err(_) => {
                             let transaction_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
                             let rsm_clone = Arc::clone(transaction_rsm);
                             let rsm_mut = rsm_clone.lock().await;
@@ -339,6 +359,7 @@ impl OmniPaxosServer {
             client_id: from,
             coordinator_id: self.id,
             id: command_id,
+            total_number_of_commands: None,
             two_phase_commit_state: None,
             cmd_type: CommandType::TransactionCommand,
             ds_cmd: None,
@@ -419,8 +440,13 @@ impl OmniPaxosServer {
         let mut db = db_clone.lock().await;
         let res = db.handle_command(data_source_command).await;
         match res {
-            Some(r) => { r }
-            None => { None }
+            Ok(option) => {
+                match option {
+                    Some(r) => { r }
+                    None => { None }
+                }
+            },
+            Err(_) => { None }
         }
     }
     async fn handle_local_datasource_command(&mut self, request_identifier: RequestIdentifier, consistency_level: ConsistencyLevel, command: DataSourceCommand) {

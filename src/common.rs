@@ -31,8 +31,9 @@ pub mod messages {
         LeaderStartSignal(Timestamp),
         BeginTransaction(Command),
         BeginTransactionReply(Command),
-        PrepareTransaction(Command),
+        WrittenAllQueriesReply(Command),
         PrepareTransactionReply(Command),
+        TransactionError(Command, bool),
         ReadRequest(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
         ReadResponse(RequestIdentifier, ConsistencyLevel, usize, Option<String>)
     }
@@ -88,7 +89,8 @@ pub mod ds {
         Begin,
         Prepare,
         Commit,
-        Abort
+        Rollback,
+        RollbackPrepared
     }
 
     #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
@@ -97,6 +99,7 @@ pub mod ds {
         pub coordinator_id: NodeId,
         pub id: CommandId,
         pub two_phase_commit_state: Option<TwoPhaseCommitState>,
+        pub total_number_of_commands: Option<usize>,
         pub cmd_type: CommandType,
         pub ds_cmd: Option<DataSourceCommand>,
         pub tx_cmd: Option<TransactionCommand>,

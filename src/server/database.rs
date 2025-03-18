@@ -19,7 +19,7 @@ impl Database {
         }
     }
 
-    pub async fn handle_command(&mut self, command: DataSourceCommand) -> Option<Option<String>> {
+    pub async fn handle_command(&mut self, command: DataSourceCommand) -> Result<Option<Option<String>>, ()> {
         let query_type = command.query_type.clone();
         let tx_id_opt = command.tx_id.clone();
         match tx_id_opt {
@@ -32,27 +32,23 @@ impl Database {
         }
     }
 
-    pub async fn begin_tx(&self, tx_id: TransactionId) {
-        Repository::begin_tx(&self.db, tx_id).await;
+    pub async fn begin_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
+        Repository::begin_tx(&self.db, tx_id).await
     }
 
-    #[allow(dead_code)]
-    pub async fn prepare_tx(&self, tx_id: TransactionId) {
-        Repository::prepare_tx(&self.db, tx_id).await;
+    pub async fn prepare_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
+        Repository::prepare_tx(&self.db, tx_id).await
     }
 
-    #[allow(dead_code)]
-    pub async fn commit_tx(&self, tx_id: TransactionId) {
-        Repository::commit_tx(&self.db, tx_id).await;
+    pub async fn commit_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
+        Repository::commit_tx(&self.db, tx_id).await
     }
 
-    #[allow(dead_code)]
-    pub async fn rollback_tx(&self, tx_id: TransactionId) {
-        Repository::rollback_tx(&self.db, tx_id).await;
+    pub async fn rollback_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
+        Repository::rollback_tx(&self.db, tx_id).await
     }
 
-    #[allow(dead_code)]
-    pub async fn rollback_prepared_tx(&self, tx_id: TransactionId) {
-        Repository::rollback_prepared_tx(&self.db, tx_id).await;
+    pub async fn rollback_prepared_tx(&self, tx_id: TransactionId) -> Result<Option<Option<String>>, ()> {
+        Repository::rollback_prepared_tx(&self.db, tx_id).await
     }
 }
