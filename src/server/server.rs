@@ -235,8 +235,6 @@ impl OmniPaxosServer {
 
     async fn handle_cluster_messages(&mut self, messages: &mut Vec<(NodeId, ClusterMessage)>) {
         for (_from, message) in messages.drain(..) {
-            trace!("{}: Received {message:?}", self.id);
-            //TODO!!!
             match message.clone() {
                 ClusterMessage::OmniPaxosMessage(rsm_identifier, m) => {
                     let omnipaxos_instance = self.omni_paxos_instances.get_mut(&rsm_identifier).unwrap();
@@ -270,30 +268,6 @@ impl OmniPaxosServer {
                         let _ = db.begin_tx(tx_id.clone()).await;
                         self.network.send_to_cluster(1, ClusterMessage::BeginTransactionReply(command)).await;
                     }
-                }
-                ClusterMessage::BeginTransactionReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
-                    let rsm_clone = Arc::clone(coordinator_rsm);
-                    let rsm_mut = rsm_clone.lock().await;
-                    rsm_mut.handle_cluster_message(message).await;
-                }
-                ClusterMessage::WrittenAllQueriesReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
-                    let rsm_clone = Arc::clone(coordinator_rsm);
-                    let rsm_mut = rsm_clone.lock().await;
-                    rsm_mut.handle_cluster_message(message).await;
-                }
-                ClusterMessage::TransactionError(_, _) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
-                    let rsm_clone = Arc::clone(coordinator_rsm);
-                    let rsm_mut = rsm_clone.lock().await;
-                    rsm_mut.handle_cluster_message(message).await;
-                }
-                ClusterMessage::PrepareTransactionReply(_) => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
-                    let rsm_clone = Arc::clone(coordinator_rsm);
-                    let rsm_mut = rsm_clone.lock().await;
-                    rsm_mut.handle_cluster_message(message).await;
                 }
                 ClusterMessage::ReadRequest(request_identifier, consistency_level, command) => {
                     info!("{}: Node: {}, as requested, I am querying database of server: {}", request_identifier, self.id, self.id);
@@ -347,6 +321,12 @@ impl OmniPaxosServer {
                             // TODO can't happen
                         }
                     }
+                }
+                _ => {
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                    let rsm_clone = Arc::clone(coordinator_rsm);
+                    let rsm_mut = rsm_clone.lock().await;
+                    rsm_mut.handle_cluster_message(message).await;
                 }
             }
         }
