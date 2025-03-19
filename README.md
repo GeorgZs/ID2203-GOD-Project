@@ -2,7 +2,7 @@
 
 Basic skeleton based on the [OmniPaxos-kv](https://github.com/haraldng/omnipaxos-kv/tree/main) library
 
-![Preliminary Structure](./Images/FinalStructure.png)
+![Preliminary Structure](./Images/FinalStructure.svg)
 
 Make sure to include .env where to connect to: see sqlx crate docs for localhost link
 
