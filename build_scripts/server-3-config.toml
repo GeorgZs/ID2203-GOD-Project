@@ -9,3 +9,4 @@ nodes = [1, 2, 3]
 initial_leader = 1
 initial_flexible_quorum = { read_quorum_size = 2, write_quorum_size = 2 }
 db_config = { host = "db3", port = "5432", db = "postgres", user = "myuser", password = "mypassword" }
+shard_leader_config = { "food" = 1, "drink" = 2, "decoration" = 3 }

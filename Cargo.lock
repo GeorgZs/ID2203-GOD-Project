@@ -524,6 +524,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
+name = "god-db"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "csv",
+ "deadpool-postgres",
+ "dotenv",
+ "env_logger",
+ "futures",
+ "log",
+ "omnipaxos",
+ "omnipaxos_storage",
+ "postgres-types",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-postgres",
+ "tokio-serde",
+ "tokio-util",
+ "toml 0.8.20",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -741,31 +766,6 @@ dependencies = [
  "omnipaxos_macros",
  "serde",
  "toml 0.7.8",
-]
-
-[[package]]
-name = "omnipaxos-kv"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "csv",
- "deadpool-postgres",
- "dotenv",
- "env_logger",
- "futures",
- "log",
- "omnipaxos",
- "omnipaxos_storage",
- "postgres-types",
- "rand 0.8.5",
- "serde",
- "serde_json",
- "tokio",
- "tokio-postgres",
- "tokio-serde",
- "tokio-util",
- "toml 0.8.20",
 ]
 
 [[package]]

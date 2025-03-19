@@ -31,4 +31,4 @@ WORKDIR /usr/local/bin
 # Tail an empty file indefinitely
 ENTRYPOINT ["tail", "-f", "/dev/null"]
 
-#ENTRYPOINT ["./cli --node 1 --consistency 'local' --action 'SELECT * FROM users;'"]
+#ENTRYPOINT ["./cli --node 3 --consistency 'leader' --table 'drink'"]

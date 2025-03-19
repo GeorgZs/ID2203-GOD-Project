@@ -1,12 +1,12 @@
 use crate::{data_collection::ClientData, network::Network};
 use chrono::Utc;
 use log::*;
-use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
+use god_db::common::{ds::*, messages::*, utils::Timestamp};
 use rand::{random, Rng};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
+use rand::distributions::{Alphanumeric, DistString};
 use tokio::time::interval;
-use omnipaxos_kv::common::ds::QueryParams;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClientConfig {
@@ -123,7 +123,6 @@ impl Client {
     }
 
     fn handle_server_message(&mut self, msg: ServerMessage) {
-        debug!("Recieved {msg:?}");
         match msg {
             ServerMessage::StartSignal(_) => (),
             server_response => {
@@ -136,11 +135,13 @@ impl Client {
     async fn send_request(&mut self, is_write: bool) {
         //TODO!!
         //randomly select ds_command as either insert or read
+        let unique_identifier = Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
-        let write_ds_command = DataSourceCommand {
+        let write_food_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
             query_type: DataSourceQueryType::INSERT,
             data_source_object: Some(DataSourceObject {
-                table_name: String::from("users"),
+                table_name: String::from("food"),
                 row_data: vec![
                     RowData{
                         row_name: String::from("name"),
@@ -151,26 +152,55 @@ impl Client {
             query_params: None,
         };
 
-        let read_ds_command = DataSourceCommand {
+        let write_drink_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
+            query_type: DataSourceQueryType::INSERT,
+            data_source_object: Some(DataSourceObject {
+                table_name: String::from("drink"),
+                row_data: vec![
+                    RowData{
+                        row_name: String::from("name"),
+                        row_value: String::from(random::<i32>().to_string())
+                    },
+                ]
+            }),
+            query_params: None,
+        };
+
+        let write_decoration_ds_command = DataSourceCommand {
+            tx_id: Some(unique_identifier.clone()),
+            query_type: DataSourceQueryType::INSERT,
+            data_source_object: Some(DataSourceObject {
+                table_name: String::from("decoration"),
+                row_data: vec![
+                    RowData{
+                        row_name: String::from("name"),
+                        row_value: String::from(random::<i32>().to_string())
+                    },
+                ]
+            }),
+            query_params: None,
+        };
+
+        /*let read_ds_command = DataSourceCommand {
             query_type: DataSourceQueryType::READ,
             data_source_object: None,
             query_params: Some(QueryParams {
-                table_name: String::from("users"),
+                table_name: String::from("food"),
                 select_all: true,
                 select_columns: None,
             }),
-        };
+        };*/
 
         let request;
 
-        match is_write {
-            true => request = ClientMessage::Append(self.next_request_id, write_ds_command),
-            false => request = ClientMessage::Append(self.next_request_id, read_ds_command),
-        };
+        request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![write_food_ds_command, write_drink_ds_command, write_decoration_ds_command]});
 
-        let address = self.active_server;
+        /*match is_write {
+            true => request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![write_ds_command]}),
+            false => request = ClientMessage::Append(self.next_request_id, TransactionCommand {tx_id: unique_identifier, data_source_commands: vec![read_ds_command]}),
+        };*/
 
-        debug!("HOLA Sending {request:?} to this address {address:?}");
         self.network.send(self.active_server, request).await;
         self.client_data.new_request(is_write);
         self.next_request_id += 1;

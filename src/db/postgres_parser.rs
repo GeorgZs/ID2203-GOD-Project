@@ -40,7 +40,6 @@ impl Parse for PGParser {
         
         query_string.push_str("');");
         self.query_string.push(query_string.clone());
-        println!("{}", query_string.clone());
         query_string
     }
     // fn parse_update(object: DataSourceObject) -> String {}

@@ -1,6 +1,6 @@
 use futures::{SinkExt, StreamExt};
 use log::*;
-use omnipaxos_kv::common::{ds::NodeId, messages::*, utils::*};
+use god_db::common::{ds::NodeId, messages::*, utils::*};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
@@ -159,7 +159,6 @@ impl ServerConnection {
             let mut buf_reader = reader.ready_chunks(batch_size);
             while let Some(messages) = buf_reader.next().await {
                 for msg in messages {
-                    // debug!("Network: Response from server {server_id}: {msg:?}");
                     match msg {
                         Ok(m) => incoming_messages.send(m).await.unwrap(),
                         Err(err) => error!("Error deserializing message: {:?}", err),

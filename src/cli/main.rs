@@ -1,7 +1,7 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
-use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
-use omnipaxos_kv::common::messages::{RequestIdentifier, ServerMessage};
+use god_db::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
+use god_db::common::messages::{RequestIdentifier, ServerMessage};
 use crate::network::Network;
 
 mod network;
@@ -20,7 +20,7 @@ struct Args {
     consistency: String,
 
     #[arg(short, long)]
-    action: String,
+    table: String,
 }
 
 #[tokio::main]
@@ -31,10 +31,11 @@ pub async fn main() {
     let unique_identifier =Alphanumeric.sample_string(&mut rand::thread_rng(), 16);
 
     let ds_command = DataSourceCommand {
+        tx_id: None,
         query_type: DataSourceQueryType::READ,
         data_source_object: None,
         query_params: Some(QueryParams {
-            table_name: String::from("users"),
+            table_name: args.table,
             select_all: true,
             select_columns: None,
         }),

@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use omnipaxos::{
     util::{FlexibleQuorum, NodeId},
     ClusterConfig, OmniPaxosConfig, ServerConfig,
 };
 use serde::{Deserialize, Serialize};
+use god_db::common::messages::TableName;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OmniPaxosServerConfig {
@@ -17,6 +19,7 @@ pub struct OmniPaxosServerConfig {
     pub initial_leader: NodeId,
     pub initial_flexible_quorum: Option<FlexibleQuorum>,
     pub db_config: DBConfig,
+    pub shard_leader_config: HashMap<TableName, NodeId>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -1,12 +1,22 @@
 pub mod messages {
     use omnipaxos::{messages::Message as OmniPaxosMessage, util::NodeId};
     use serde::{Deserialize, Serialize};
+    use crate::common::ds::{TransactionCommand};
     use super::{
         ds::{Command, CommandId, DataSourceCommand},
         utils::Timestamp,
     };
 
     pub type RequestIdentifier = String;
+
+    pub type TableName = String;
+
+    #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+    pub enum RSMIdentifier {
+        TransactionStage,
+        ClientRequests,
+        ShardSpecific(TableName)
+    }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum RegistrationMessage {
@@ -17,8 +27,13 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClusterMessage {
-        OmniPaxosMessage(OmniPaxosMessage<Command>),
+        OmniPaxosMessage(RSMIdentifier, OmniPaxosMessage<Command>),
         LeaderStartSignal(Timestamp),
+        BeginTransaction(Command),
+        BeginTransactionReply(Command),
+        WrittenAllQueriesReply(Command),
+        PrepareTransactionReply(Command),
+        TransactionError(Command, bool),
         ReadRequest(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
         ReadResponse(RequestIdentifier, ConsistencyLevel, usize, Option<String>)
     }
@@ -32,7 +47,7 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub enum ClientMessage {
-        Append(CommandId, DataSourceCommand),
+        Append(CommandId, TransactionCommand),
         Read(RequestIdentifier, ConsistencyLevel, DataSourceCommand),
     }
 
@@ -57,30 +72,48 @@ pub mod messages {
 }
 
 pub mod ds {
+    use std::fmt::Debug;
     use omnipaxos::{macros::Entry};
     use serde::{Deserialize, Serialize};
+    use crate::common::messages::TableName;
 
     pub type CommandId = usize;
     pub type ClientId = u64;
     pub type NodeId = omnipaxos::util::NodeId;
     pub type InstanceId = NodeId;
 
+    pub type TransactionId = String;
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum TwoPhaseCommitState {
+        Begin,
+        Prepare,
+        Commit,
+        Rollback,
+        RollbackPrepared
+    }
+
     #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
     pub struct Command {
         pub client_id: ClientId,
         pub coordinator_id: NodeId,
         pub id: CommandId,
-        pub ds_cmd: DataSourceCommand,
+        pub tx_id: Option<TransactionId>,
+        pub two_phase_commit_state: Option<TwoPhaseCommitState>,
+        pub total_number_of_commands: Option<usize>,
+        pub cmd_type: CommandType,
+        pub ds_cmd: Option<DataSourceCommand>,
+        pub tx_cmd: Option<TransactionCommand>,
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct RowData {
         pub row_name: String,
         pub row_value: String
     }
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceObject {
-        pub table_name: String,
+        pub table_name: TableName,
         pub row_data: Vec<RowData>
     }
 
@@ -91,16 +124,29 @@ pub mod ds {
         READ
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct DataSourceCommand {
+        pub tx_id: Option<TransactionId>,
         pub data_source_object: Option<DataSourceObject>,
         pub query_type: DataSourceQueryType,
         pub query_params: Option<QueryParams>,
     }
 
-    #[derive(Debug, Clone, Entry, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct TransactionCommand {
+        pub tx_id: TransactionId,
+        pub data_source_commands: Vec<DataSourceCommand>
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub enum CommandType {
+        DatasourceCommand,
+        TransactionCommand
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct QueryParams {
-        pub table_name: String,
+        pub table_name: TableName,
         pub select_all: bool,
         pub select_columns: Option<Vec<String>>,
         //SELECT * from table_name
