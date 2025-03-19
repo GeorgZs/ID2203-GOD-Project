@@ -42,6 +42,6 @@ with a skewed workload.
 ---
 **Category**: Distributed databases
 
-**Language and libraries**: Rust, OmniPaxos, Tokio, Docker, SQL
+**Language and libraries**: Rust, OmniPaxos, Tokio, Docker, SQL, postgres-tokio
 
-**Repository**: https://github.com/haraldng/omnipaxos-kv
+**Extends**: https://github.com/haraldng/omnipaxos-kv
