@@ -1,8 +1,8 @@
-use omnipaxos_kv::common::ds::{DataSourceCommand, TransactionId};
-use omnipaxos_kv::db::postgres_connection::PGConnection;
-use omnipaxos_kv::db::postgres_parser::PGParser;
-use omnipaxos_kv::db::query_parser::{Parse, QueryParser};
-use omnipaxos_kv::db::repository::{DataSourceConnection, Repository};
+use god_db::common::ds::{DataSourceCommand, TransactionId};
+use god_db::db::postgres_connection::PGConnection;
+use god_db::db::postgres_parser::PGParser;
+use god_db::db::query_parser::{Parse, QueryParser};
+use god_db::db::repository::{DataSourceConnection, Repository};
 
 use crate::configs::DBConfig;
 

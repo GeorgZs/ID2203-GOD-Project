@@ -1,6 +1,6 @@
 use futures::{SinkExt, StreamExt};
 use log::*;
-use omnipaxos_kv::common::{
+use god_db::common::{
     ds::{ClientId, NodeId},
     messages::*,
     utils::*,

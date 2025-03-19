@@ -1,7 +1,7 @@
 use clap::Parser;
 use rand::distributions::{Alphanumeric, DistString};
-use omnipaxos_kv::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
-use omnipaxos_kv::common::messages::{RequestIdentifier, ServerMessage};
+use god_db::common::{ds::{DataSourceCommand, DataSourceQueryType, QueryParams}, messages::{ClientMessage, ConsistencyLevel}};
+use god_db::common::messages::{RequestIdentifier, ServerMessage};
 use crate::network::Network;
 
 mod network;

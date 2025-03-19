@@ -4,7 +4,7 @@ use omnipaxos::{
     ClusterConfig, OmniPaxosConfig, ServerConfig,
 };
 use serde::{Deserialize, Serialize};
-use omnipaxos_kv::common::messages::TableName;
+use god_db::common::messages::TableName;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OmniPaxosServerConfig {

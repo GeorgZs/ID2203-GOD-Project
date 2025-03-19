@@ -4,7 +4,7 @@ use log::*;
 use omnipaxos::{
     util::{NodeId}
 };
-use omnipaxos_kv::common::{ds::*, messages::*, utils::Timestamp};
+use god_db::common::{ds::*, messages::*, utils::Timestamp};
 use std::{fs::File, io::Write, time::Duration};
 use std::collections::HashMap;
 use std::sync::Arc;

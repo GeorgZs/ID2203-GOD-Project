@@ -8,8 +8,8 @@ use omnipaxos::storage::{Storage};
 use omnipaxos::util::{LogEntry, NodeId};
 use omnipaxos_storage::memory_storage::MemoryStorage;
 use tokio::sync::Mutex;
-use omnipaxos_kv::common::ds::{Command};
-use omnipaxos_kv::common::messages::{ClusterMessage, RSMIdentifier};
+use god_db::common::ds::{Command};
+use god_db::common::messages::{ClusterMessage, RSMIdentifier};
 use crate::configs::OmniPaxosServerConfig;
 use crate::network::Network;
 
