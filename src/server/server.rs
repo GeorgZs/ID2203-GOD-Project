@@ -12,8 +12,8 @@ use tokio::sync::Mutex;
 use crate::coordinator_rsm::CoordinatorRSMConsumer;
 use crate::network::CliNetwork;
 use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
-use crate::shard_rsm::ShardRSMConsumer;
-use crate::transactions_rsm::TransactionsRSMConsumer;
+use crate::shard_specific_manager::ShardSpecificManager;
+use crate::transaction_stage_manager::TransactionStageManager;
 
 const NETWORK_BATCH_SIZE: usize = 100;
 const LEADER_WAIT: Duration = Duration::from_secs(1);
@@ -71,30 +71,30 @@ impl OmniPaxosServer {
             read_requests: HashMap::new()
         };
 
-        let shard_rsm_consumer = Arc::new(Mutex::new(ShardRSMConsumer::new(server.id, Arc::clone(&server.database), Arc::clone(&server.network))));
-
-        let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(FOOD.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
-        let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DRINK.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
-        let decoration_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Shard(DECORATION.to_string()), server.config.clone(), Arc::clone(&shard_rsm_consumer) as Arc<Mutex<dyn RSMConsumer>>);
+        let shard_specific_manager = Arc::new(Mutex::new(ShardSpecificManager::new(server.id, Arc::clone(&server.database), Arc::clone(&server.network))));
+        let food_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::ShardSpecific(FOOD.to_string()), server.config.clone(), Arc::clone(&shard_specific_manager) as Arc<Mutex<dyn RSMConsumer>>);
+        let drink_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::ShardSpecific(DRINK.to_string()), server.config.clone(), Arc::clone(&shard_specific_manager) as Arc<Mutex<dyn RSMConsumer>>);
+        let decoration_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::ShardSpecific(DECORATION.to_string()), server.config.clone(), Arc::clone(&shard_specific_manager) as Arc<Mutex<dyn RSMConsumer>>);
 
         // Add rsm to omnipaxos instances
-        server.omni_paxos_instances.insert(RSMIdentifier::Shard(FOOD.to_string()), food_omnipaxos_rsm);
-        server.omni_paxos_instances.insert(RSMIdentifier::Shard(DRINK.to_string()), drink_omnipaxos_rsm);
-        server.omni_paxos_instances.insert(RSMIdentifier::Shard(DECORATION.to_string()), decoration_omnipaxos_rsm);
+        server.omni_paxos_instances.insert(RSMIdentifier::ShardSpecific(FOOD.to_string()), food_omnipaxos_rsm);
+        server.omni_paxos_instances.insert(RSMIdentifier::ShardSpecific(DRINK.to_string()), drink_omnipaxos_rsm);
+        server.omni_paxos_instances.insert(RSMIdentifier::ShardSpecific(DECORATION.to_string()), decoration_omnipaxos_rsm);
 
         //Find table name for specific server id based on shard_leader_config
         let (table_name, _) = shard_leader_config.iter().find(|(_, &v)| v == server.id).unwrap();
-
         //Find leader_shard_rsm_identifier via table name
-        let (leader_shard_rsm_identifier, _) = server.omni_paxos_instances.iter().find(|(k, _)| matches!(k, RSMIdentifier::Shard(name) if name == table_name)).unwrap();
+        let (leader_shard_rsm_identifier, _) = server.omni_paxos_instances.iter().find(|(k, _)| matches!(k, RSMIdentifier::ShardSpecific(name) if name == table_name)).unwrap();
 
-        let mut transactions_rsm_consumer = TransactionsRSMConsumer::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
-        transactions_rsm_consumer.shard_leader_rsm = Some(Arc::clone(server.omni_paxos_instances.get(&leader_shard_rsm_identifier).unwrap()));
-        let coordinator_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Coordinator, server.config.clone(), Arc::new(Mutex::new(transactions_rsm_consumer)) as Arc<Mutex<dyn RSMConsumer>>);
-        let coordinator_rsm_consumer = CoordinatorRSMConsumer::new(server_id, Arc::clone(&coordinator_omnipaxos_rsm), Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
-        let transactions_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::Transaction, server.config.clone(), Arc::new(Mutex::new(coordinator_rsm_consumer)) as Arc<Mutex<dyn RSMConsumer>>);
-        server.omni_paxos_instances.insert(RSMIdentifier::Transaction, transactions_omnipaxos_rsm);
-        server.omni_paxos_instances.insert(RSMIdentifier::Coordinator, coordinator_omnipaxos_rsm);
+        let mut transaction_stage_manager = TransactionStageManager::new(server_id, Arc::clone(&server.network), Arc::clone(&server.database), shard_leader_config.clone());
+        transaction_stage_manager.shard_leader_rsm = Some(Arc::clone(server.omni_paxos_instances.get(&leader_shard_rsm_identifier).unwrap()));
+        let transaction_stage_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::TransactionStage, server.config.clone(), Arc::new(Mutex::new(transaction_stage_manager)) as Arc<Mutex<dyn RSMConsumer>>);
+
+        let coordinating_manager = CoordinatorRSMConsumer::new(server_id, Arc::clone(&transaction_stage_omnipaxos_rsm), Arc::clone(&server.network), Arc::clone(&server.database), server.peers.clone());
+        let client_requests_omnipaxos_rsm = OmniPaxosRSM::new(RSMIdentifier::ClientRequests, server.config.clone(), Arc::new(Mutex::new(coordinating_manager)) as Arc<Mutex<dyn RSMConsumer>>);
+
+        server.omni_paxos_instances.insert(RSMIdentifier::ClientRequests, client_requests_omnipaxos_rsm);
+        server.omni_paxos_instances.insert(RSMIdentifier::TransactionStage, transaction_stage_omnipaxos_rsm);
         server.save_output().expect("Failed to write to file");
         server
     }
@@ -240,8 +240,8 @@ impl OmniPaxosServer {
                     let omnipaxos_instance = self.omni_paxos_instances.get_mut(&rsm_identifier).unwrap();
                     let rsm_clone = Arc::clone(omnipaxos_instance);
                     let mut rsm_mut = rsm_clone.lock().await;
-                    let coordinator_id = if rsm_identifier != RSMIdentifier::Transaction {
-                        let coord_cl = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                    let coordinator_id = if rsm_identifier != RSMIdentifier::ClientRequests {
+                        let coord_cl = self.omni_paxos_instances.get(&RSMIdentifier::ClientRequests).unwrap();
                         let coordinator = coord_cl.lock().await;
                         match coordinator.get_current_leader() {
                             Some((ld_id, _)) => Some(ld_id),
@@ -323,7 +323,7 @@ impl OmniPaxosServer {
                     }
                 }
                 _ => {
-                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::Transaction).unwrap();
+                    let coordinator_rsm = self.omni_paxos_instances.get(&RSMIdentifier::ClientRequests).unwrap();
                     let rsm_clone = Arc::clone(coordinator_rsm);
                     let rsm_mut = rsm_clone.lock().await;
                     rsm_mut.handle_cluster_message(message).await;
@@ -349,7 +349,7 @@ impl OmniPaxosServer {
             ds_cmd: None,
             tx_cmd: Some(tx_cmd)
         };
-        let rsm = self.omni_paxos_instances.get_mut(&RSMIdentifier::Transaction).unwrap();
+        let rsm = self.omni_paxos_instances.get_mut(&RSMIdentifier::ClientRequests).unwrap();
         let rsm_clone = Arc::clone(rsm);
         let mut rsm_mut = rsm_clone.lock().await;
         rsm_mut.append_to_log(command);
@@ -437,7 +437,7 @@ impl OmniPaxosServer {
 
     async fn get_shard_rsm_for_datasource_command(&self, data_source_command: DataSourceCommand) -> Arc<Mutex<OmniPaxosRSM>> {
         let table_name = data_source_command.query_params.unwrap().table_name.clone();
-        let (leader_shard_rsm_identifier, _) = self.omni_paxos_instances.iter().find(|(k, _)| matches!(k, RSMIdentifier::Shard(name) if name == &table_name)).unwrap();
+        let (leader_shard_rsm_identifier, _) = self.omni_paxos_instances.iter().find(|(k, _)| matches!(k, RSMIdentifier::ShardSpecific(name) if name == &table_name)).unwrap();
         Arc::clone(&self.omni_paxos_instances.get(leader_shard_rsm_identifier).unwrap())
     }
 }

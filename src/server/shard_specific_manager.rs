@@ -9,20 +9,20 @@ use crate::database::Database;
 use crate::network::Network;
 use crate::omnipaxos_rsm::RSMConsumer;
 
-pub struct ShardRSMConsumer {
+pub struct ShardSpecificManager {
     id: NodeId,
     database: Arc<Mutex<Database>>,
     network: Arc<Network>,
     queries_written: Arc<Mutex<HashMap<TransactionId, u64>>>,
 }
 
-impl ShardRSMConsumer {
+impl ShardSpecificManager {
     pub fn new(id: NodeId, database: Arc<Mutex<Database>>, network: Arc<Network>) -> Self {
-        ShardRSMConsumer { id, database, network, queries_written: Arc::new(Mutex::new(HashMap::new())) }
+        ShardSpecificManager { id, database, network, queries_written: Arc::new(Mutex::new(HashMap::new())) }
     }
 }
 
-impl RSMConsumer for ShardRSMConsumer {
+impl RSMConsumer for ShardSpecificManager {
     fn get_network(&self) -> Arc<Network> {
         Arc::clone(&self.network)
     }

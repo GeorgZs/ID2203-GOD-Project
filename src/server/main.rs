@@ -8,8 +8,8 @@ mod database;
 mod network;
 mod server;
 mod omnipaxos_rsm;
-mod transactions_rsm;
-mod shard_rsm;
+mod transaction_stage_manager;
+mod shard_specific_manager;
 mod coordinator_rsm;
 
 #[tokio::main]

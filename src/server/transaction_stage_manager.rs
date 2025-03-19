@@ -8,7 +8,7 @@ use crate::database::Database;
 use crate::network::Network;
 use crate::omnipaxos_rsm::{OmniPaxosRSM, RSMConsumer};
 
-pub struct TransactionsRSMConsumer {
+pub struct TransactionStageManager {
     id: NodeId,
     network: Arc<Network>,
     shard_leader_config: HashMap<TableName, NodeId>,
@@ -16,9 +16,9 @@ pub struct TransactionsRSMConsumer {
     pub shard_leader_rsm: Option<Arc<Mutex<OmniPaxosRSM>>>
 }
 
-impl TransactionsRSMConsumer {
-    pub fn new(id: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> TransactionsRSMConsumer {
-        TransactionsRSMConsumer { id, network, shard_leader_config, database, shard_leader_rsm: None }
+impl TransactionStageManager {
+    pub fn new(id: NodeId, network: Arc<Network>, database: Arc<Mutex<Database>>, shard_leader_config: HashMap<TableName, NodeId>) -> TransactionStageManager {
+        TransactionStageManager { id, network, shard_leader_config, database, shard_leader_rsm: None }
     }
 
     fn handle_coordinator_begin_command(&self, command: Command) -> BoxFuture<()> {
@@ -86,7 +86,7 @@ impl TransactionsRSMConsumer {
     }
 }
 
-impl RSMConsumer for TransactionsRSMConsumer {
+impl RSMConsumer for TransactionStageManager {
     fn get_network(&self) -> Arc<Network> {
         Arc::clone(&self.network)
     }

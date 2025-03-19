@@ -13,9 +13,9 @@ pub mod messages {
 
     #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
     pub enum RSMIdentifier {
-        Coordinator,
-        Transaction,
-        Shard(TableName)
+        TransactionStage,
+        ClientRequests,
+        ShardSpecific(TableName)
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
