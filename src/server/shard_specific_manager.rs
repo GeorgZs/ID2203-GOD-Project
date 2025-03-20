@@ -41,7 +41,12 @@ impl RSMConsumer for ShardSpecificManager {
                         if let Some(number_of_queries) = command.total_number_of_commands {
                             if let Some(tx_id) = tx_id_opt {
                                 if res.is_err() {
-                                    self.network.send_to_cluster(1, ClusterMessage::TransactionError(cmd, false)).await;
+                                    let coord_id = coordinator_id.unwrap();
+                                    if self.id == coord_id {
+                                        let _ = self.network.cluster_message_sender.send((coord_id, ClusterMessage::TransactionError(cmd, false))).await;
+                                    } else {
+                                        self.network.send_to_cluster(coord_id, ClusterMessage::TransactionError(cmd, false)).await;
+                                    }
                                 } else {
                                     let qw_cl = Arc::clone(&self.queries_written);
                                     let mut queries_written = qw_cl.lock().await;

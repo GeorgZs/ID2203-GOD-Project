@@ -21,10 +21,14 @@ pub trait RSMConsumer: Send + Sync {
 
 pub struct OmniPaxosRSM {
     rsm_identifier: RSMIdentifier,
+    // Differentiates the functionality from every node, or which node should I listen from.
     id: NodeId,
+    // Library object from omnipaxos
     omnipaxos: OmniPaxos<Command, MemoryStorage<Command>>,
     pub current_decided_idx: usize,
+    // Buffer for msgs we have not sent yet
     omnipaxos_msg_buffer: Vec<Message<Command>>,
+    // Allows composition inheritance
     consumer: Arc<Mutex<dyn RSMConsumer>>,
 }
 

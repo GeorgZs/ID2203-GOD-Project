@@ -20,7 +20,7 @@ enum TwoPhaseCommitAckType {
 
 pub struct CoordinatorRSMConsumer {
     id: NodeId,
-    coordinator_rsm: Arc<Mutex<OmniPaxosRSM>>,
+    transaction_stage_rsm: Arc<Mutex<OmniPaxosRSM>>,
 
     network: Arc<Network>,
     database: Arc<Mutex<Database>>,
@@ -29,8 +29,8 @@ pub struct CoordinatorRSMConsumer {
 }
 
 impl CoordinatorRSMConsumer {
-    pub fn new(id: NodeId, coordinator_rsm: Arc<Mutex<OmniPaxosRSM>>, network: Arc<Network>, database: Arc<Mutex<Database>>, peers: Vec<NodeId>) -> CoordinatorRSMConsumer {
-        CoordinatorRSMConsumer {id, coordinator_rsm, network, database, peers, ack_responses: Arc::new(Mutex::new(HashMap::new()))}
+    pub fn new(id: NodeId, transaction_stage_rsm: Arc<Mutex<OmniPaxosRSM>>, network: Arc<Network>, database: Arc<Mutex<Database>>, peers: Vec<NodeId>) -> CoordinatorRSMConsumer {
+        CoordinatorRSMConsumer {id, transaction_stage_rsm, network, database, peers, ack_responses: Arc::new(Mutex::new(HashMap::new()))}
     }
 
     fn transaction_reply(&self, command: Command, two_phase_commit_ack_type: TwoPhaseCommitAckType) -> BoxFuture<bool> {
@@ -99,11 +99,13 @@ impl RSMConsumer for CoordinatorRSMConsumer {
     fn handle_cluster_message(&self, message: ClusterMessage) -> BoxFuture<()> {
         Box::pin(async move {
             match message {
+                // Just change status to begin and finish.
                 ClusterMessage::BeginTransactionReply(command) => {
                     let comm = command.clone();
+                    // Check specifically for begin responses
                     let acks_met = self.transaction_reply(comm.clone(), Begin).await;
                     if acks_met {
-                        let rsm_cl = Arc::clone(&self.coordinator_rsm);
+                        let rsm_cl = Arc::clone(&self.transaction_stage_rsm);
                         let mut rsm = rsm_cl.lock().await;
                         let cmd = Command {
                             client_id: command.client_id,
@@ -119,31 +121,11 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                         rsm.append_to_log(cmd);
                     }
                 }
-                ClusterMessage::PrepareTransactionReply(command) => {
-                    let comm = command.clone();
-                    let acks_met = self.transaction_reply(command.clone(), TwoPhaseCommitAckType::Prepare).await;
-                    if acks_met {
-                        let rsm_cl = Arc::clone(&self.coordinator_rsm);
-                        let mut rsm = rsm_cl.lock().await;
-                        let cmd = Command {
-                            client_id: command.client_id,
-                            coordinator_id: command.coordinator_id,
-                            id: command.id,
-                            tx_id: comm.tx_id,
-                            two_phase_commit_state: Some(TwoPhaseCommitState::Commit),
-                            total_number_of_commands: None,
-                            cmd_type: TransactionCommand,
-                            ds_cmd: None,
-                            tx_cmd: command.tx_cmd,
-                        };
-                        rsm.append_to_log(cmd);
-                    }
-                }
                 ClusterMessage::WrittenAllQueriesReply(command) => {
                     let comm = command.clone();
                     let acks_met = self.transaction_reply(command.clone(), TwoPhaseCommitAckType::Written).await;
                     if acks_met {
-                        let rsm_cl = Arc::clone(&self.coordinator_rsm);
+                        let rsm_cl = Arc::clone(&self.transaction_stage_rsm);
                         let mut rsm = rsm_cl.lock().await;
                         let cmd = Command {
                             client_id: command.client_id,
@@ -159,8 +141,28 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                         rsm.append_to_log(cmd);
                     }
                 }
+                ClusterMessage::PrepareTransactionReply(command) => {
+                    let comm = command.clone();
+                    let acks_met = self.transaction_reply(command.clone(), TwoPhaseCommitAckType::Prepare).await;
+                    if acks_met {
+                        let rsm_cl = Arc::clone(&self.transaction_stage_rsm);
+                        let mut rsm = rsm_cl.lock().await;
+                        let cmd = Command {
+                            client_id: command.client_id,
+                            coordinator_id: command.coordinator_id,
+                            id: command.id,
+                            tx_id: comm.tx_id,
+                            two_phase_commit_state: Some(TwoPhaseCommitState::Commit),
+                            total_number_of_commands: None,
+                            cmd_type: TransactionCommand,
+                            ds_cmd: None,
+                            tx_cmd: command.tx_cmd,
+                        };
+                        rsm.append_to_log(cmd);
+                    }
+                }
                 ClusterMessage::TransactionError(command, prepared) => {
-                    let rsm_cl = Arc::clone(&self.coordinator_rsm);
+                    let rsm_cl = Arc::clone(&self.transaction_stage_rsm);
                     let mut rsm = rsm_cl.lock().await;
                     let cmd = Command {
                         client_id: command.client_id,

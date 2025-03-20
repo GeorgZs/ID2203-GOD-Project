@@ -53,6 +53,7 @@ impl TransactionStageManager {
                         let tx_id = cmd.tx_id.clone();
                         if let Some(ref ds_obj) = ds_cmd.data_source_object {
                             if let Some(leader_id) = self.shard_leader_config.get(&ds_obj.table_name) {
+                                // Get table leader ID and if I am responsible, I extract those queries and append it to the log
                                 if self.id == *leader_id {
                                     match self.shard_leader_rsm {
                                         Some(ref leader_rsm) => {
@@ -63,6 +64,7 @@ impl TransactionStageManager {
                                                 coordinator_id: command.coordinator_id,
                                                 id: command_id,
                                                 tx_id,
+                                                // Used later on as th counter for checking how many have executed
                                                 total_number_of_commands: Some(len),
                                                 two_phase_commit_state: None,
                                                 cmd_type: CommandType::DatasourceCommand,
@@ -113,6 +115,7 @@ impl RSMConsumer for TransactionStageManager {
                                     }
                                 }
                                 Err(_) => {
+                                    // Handle different prepare failures as setting 'false' value initiates normal Rollback before prepare
                                     if self.id == coord_id {
                                         let _ = self.network.cluster_message_sender.send((coord_id, ClusterMessage::TransactionError(command, true))).await;
                                     } else {

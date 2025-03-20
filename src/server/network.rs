@@ -289,6 +289,7 @@ impl Network {
                     None => { None }
                 }
             }
+            // Here we identify that it is a CLI connection
             Some(Ok(RegistrationMessage::CliClientRegister(request_identifier))) => {
                 info!("Identified connection from cli client {:?}", request_identifier);
                 let underlying_stream = registration_connection.into_inner().into_inner();

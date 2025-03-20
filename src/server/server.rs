@@ -33,10 +33,12 @@ pub struct OmniPaxosServer {
     database: Arc<Mutex<Database>>,
     network: Arc<Network>,
     cli_network: Arc<CliNetwork>,
+    // Abstraction of OmniPaxos from server
     omni_paxos_instances: HashMap<RSMIdentifier, Arc<Mutex<OmniPaxosRSM>>>,
     output_file: File,
     config: OmniPaxosServerConfig,
     peers: Vec<NodeId>,
+    // Stores responses from other nodes - only when reading linearizable answers
     read_requests: HashMap<RequestIdentifier, Vec<ResponseValue>>
 }
 
@@ -113,6 +115,7 @@ impl OmniPaxosServer {
             self.send_cluster_start_signals(experiment_sync_start).await;
             self.send_client_start_signals(experiment_sync_start).await;
         }
+        // Create a thread for keeping specifically CLI connections
         let cloned_cli_network = Arc::clone(&self.cli_network);
         tokio::spawn({
             async move {
@@ -125,6 +128,7 @@ impl OmniPaxosServer {
             let cli_net_clone = Arc::clone(&self.cli_network);
             let network_clone = Arc::clone(&self.network);
             tokio::select! {
+                // Every timeout check if leader is up or down or elect a new one
                 _ = election_interval.tick() => {
                     for rsm in self.omni_paxos_instances.values_mut() {
                         let rsm_clone = Arc::clone(rsm);
