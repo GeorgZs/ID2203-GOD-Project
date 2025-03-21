@@ -62,6 +62,9 @@ impl RSMConsumer for ShardSpecificManager {
                                             } else {
                                                 self.network.send_to_cluster(coord_id, ClusterMessage::WrittenAllQueriesReply(cmd)).await;
                                             }
+                                            let map_cl = Arc::clone(&self.queries_written);
+                                            let mut map = map_cl.lock().await;
+                                            map.remove(&tx_id);
                                         }
                                     }
                                 }
