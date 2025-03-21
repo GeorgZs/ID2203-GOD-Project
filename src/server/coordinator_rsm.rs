@@ -151,7 +151,7 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                             client_id: command.client_id,
                             coordinator_id: command.coordinator_id,
                             id: command.id,
-                            tx_id: comm.tx_id,
+                            tx_id: comm.tx_id.clone(),
                             two_phase_commit_state: Some(TwoPhaseCommitState::Commit),
                             total_number_of_commands: None,
                             cmd_type: TransactionCommand,
@@ -159,6 +159,9 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                             tx_cmd: command.tx_cmd,
                         };
                         rsm.append_to_log(cmd);
+                        let map_cl = Arc::clone(&self.ack_responses);
+                        let mut map = map_cl.lock().await;
+                        map.remove(&comm.tx_id.unwrap());
                     }
                 }
                 ClusterMessage::TransactionError(command, prepared) => {
@@ -168,7 +171,7 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                         client_id: command.client_id,
                         coordinator_id: command.coordinator_id,
                         id: command.id,
-                        tx_id: command.tx_id,
+                        tx_id: command.tx_id.clone(),
                         two_phase_commit_state: Some(if prepared { TwoPhaseCommitState::RollbackPrepared } else { TwoPhaseCommitState::Rollback }),
                         total_number_of_commands: None,
                         cmd_type: TransactionCommand,
@@ -176,6 +179,9 @@ impl RSMConsumer for CoordinatorRSMConsumer {
                         tx_cmd: command.tx_cmd,
                     };
                     rsm.append_to_log(cmd);
+                    let map_cl = Arc::clone(&self.ack_responses);
+                    let mut map = map_cl.lock().await;
+                    map.remove(&command.tx_id.unwrap());
                 }
                 _ => {
 
